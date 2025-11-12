@@ -62,3 +62,24 @@ def delete_history(index):
             'success': False,
             'error': str(e)
         }, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@predictions_bp.delete('/history')
+def clear_all_history():
+    try:
+        success = service.clear_all_history()
+        if success:
+            return {
+                'success': True,
+                'message': 'All history records deleted successfully'
+            }, HTTPStatus.OK
+        else:
+            return {
+                'success': False,
+                'error': 'Failed to clear history'
+            }, HTTPStatus.INTERNAL_SERVER_ERROR
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }, HTTPStatus.INTERNAL_SERVER_ERROR

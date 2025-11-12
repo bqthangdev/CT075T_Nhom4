@@ -20,7 +20,7 @@ const AboutPage = () => {
 
           <Title level={3}>Mục tiêu</Title>
           <Paragraph>
-            <ul>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
               <li>Cung cấp công cụ hỗ trợ chuẩn đoán sớm nguy cơ đột quỵ</li>
               <li>Nâng cao nhận thức về các yếu tố nguy cơ</li>
               <li>Hỗ trợ bác sĩ trong quá trình đánh giá sức khỏe bệnh nhân</li>
@@ -32,7 +32,7 @@ const AboutPage = () => {
           <Title level={3}>Công nghệ sử dụng</Title>
           <Paragraph>
             <strong>Frontend:</strong>
-            <ul>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
               <li>React.js - Thư viện UI</li>
               <li>Ant Design - UI Components</li>
               <li>React Router - Routing</li>
@@ -40,7 +40,7 @@ const AboutPage = () => {
           </Paragraph>
           <Paragraph>
             <strong>Backend:</strong>
-            <ul>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
               <li>Node.js - Runtime environment</li>
               <li>Express.js - Web framework</li>
               <li>MongoDB - Database</li>

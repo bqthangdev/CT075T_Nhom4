@@ -1,17 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Form, InputNumber, Select, Button, message, Collapse, Divider, Alert, Space, Popconfirm } from 'antd';
-import { SettingOutlined, SaveOutlined, ReloadOutlined, ThunderboltOutlined } from '@ant-design/icons';
-import axios from 'axios';
+import { Card, Form, InputNumber, Select, Button, message, Collapse, Divider, Alert, Space, Popconfirm, Progress, Modal, Spin } from 'antd';
+import { SettingOutlined, SaveOutlined, ReloadOutlined, ThunderboltOutlined, LoadingOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import api from '../services/api';
 
 const { Panel } = Collapse;
 const { Option } = Select;
 
-const API_BASE = 'http://localhost:8000/api/v1';
-
 const ModelConfigPage = () => {
   const [config, setConfig] = useState(null);
+  const [savedConfig, setSavedConfig] = useState(null); // Track saved config for comparison
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [training, setTraining] = useState(false);
+  const [trainingProgress, setTrainingProgress] = useState(0);
+  const [trainingMessage, setTrainingMessage] = useState('');
+  const [trainingModalVisible, setTrainingModalVisible] = useState(false);
+  const [configChanged, setConfigChanged] = useState(false); // Track if config has been modified
 
   const [lrForm] = Form.useForm();
   const [rfForm] = Form.useForm();
@@ -25,21 +29,23 @@ const ModelConfigPage = () => {
   const fetchConfig = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_BASE}/config`);
-      setConfig(response.data);
+      const response = await api.getConfig();
+      setConfig(response);
+      setSavedConfig(JSON.parse(JSON.stringify(response))); // Deep copy for comparison
+      setConfigChanged(false); // Reset change flag
       
       // Set form values
-      if (response.data.logistic_regression) {
-        lrForm.setFieldsValue(response.data.logistic_regression);
+      if (response.logistic_regression) {
+        lrForm.setFieldsValue(response.logistic_regression);
       }
-      if (response.data.random_forest) {
-        rfForm.setFieldsValue(response.data.random_forest);
+      if (response.random_forest) {
+        rfForm.setFieldsValue(response.random_forest);
       }
-      if (response.data.gradient_boosting) {
-        gbForm.setFieldsValue(response.data.gradient_boosting);
+      if (response.gradient_boosting) {
+        gbForm.setFieldsValue(response.gradient_boosting);
       }
-      if (response.data.knn) {
-        knnForm.setFieldsValue(response.data.knn);
+      if (response.knn) {
+        knnForm.setFieldsValue(response.knn);
       }
       
       message.success('Tải cấu hình thành công!');
@@ -66,8 +72,10 @@ const ModelConfigPage = () => {
       };
 
       setSaving(true);
-      await axios.put(`${API_BASE}/config`, newConfig);
+      await api.updateConfig(newConfig);
       setConfig(newConfig);
+      setSavedConfig(JSON.parse(JSON.stringify(newConfig))); // Update saved config
+      setConfigChanged(false); // Reset change flag after save
       message.success('Lưu cấu hình thành công! Vui lòng train lại model để áp dụng.');
     } catch (error) {
       if (error.errorFields) {
@@ -84,7 +92,7 @@ const ModelConfigPage = () => {
   const handleReset = async () => {
     try {
       setSaving(true);
-      await axios.post(`${API_BASE}/config/reset`);
+      await api.resetConfig();
       message.success('Đặt lại cấu hình mặc định thành công!');
       fetchConfig();
     } catch (error) {
@@ -95,13 +103,140 @@ const ModelConfigPage = () => {
     }
   };
 
+  const checkConfigChanges = () => {
+    // Compare current form values with saved config
+    if (!savedConfig) return true; // If no saved config, allow training
+
+    try {
+      const currentLR = lrForm.getFieldsValue();
+      const currentRF = rfForm.getFieldsValue();
+      const currentGB = gbForm.getFieldsValue();
+      const currentKNN = knnForm.getFieldsValue();
+
+      const currentConfig = {
+        logistic_regression: currentLR,
+        random_forest: currentRF,
+        gradient_boosting: currentGB,
+        knn: currentKNN,
+      };
+
+      // Deep comparison
+      return JSON.stringify(currentConfig) !== JSON.stringify(savedConfig);
+    } catch (error) {
+      console.error('Error checking config changes:', error);
+      return true; // Allow training if error
+    }
+  };
+
+  const handleTrain = async () => {
+    try {
+      // Check if there are any changes
+      const hasChanges = checkConfigChanges();
+      
+      if (!hasChanges) {
+        Modal.info({
+          title: '✅ Không có thay đổi',
+          content: (
+            <div>
+              <p style={{ fontSize: 15, marginBottom: 12 }}>
+                Không có thông số kỹ thuật nào thay đổi so với cấu hình hiện tại.
+              </p>
+              <p style={{ fontSize: 14, color: '#666', marginBottom: 0 }}>
+                Models hiện tại đã được training với cấu hình này. Không cần training lại.
+              </p>
+            </div>
+          ),
+          okText: 'Đã hiểu',
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+        });
+        return;
+      }
+
+      // Warn if config has changes but not saved yet
+      Modal.confirm({
+        title: '⚠️ Xác nhận training',
+        content: (
+          <div>
+            <p style={{ fontSize: 15, marginBottom: 12 }}>
+              Phát hiện có thay đổi cấu hình. Bạn có muốn tiếp tục training với cấu hình hiện tại?
+            </p>
+            <Alert
+              message="Lưu ý"
+              description="Nếu bạn chưa lưu cấu hình, các thay đổi sẽ không được áp dụng. Hãy nhấn 'Lưu cấu hình' trước khi training."
+              type="warning"
+              showIcon
+              style={{ marginTop: 12 }}
+            />
+          </div>
+        ),
+        okText: 'Tiếp tục training',
+        cancelText: 'Hủy',
+        okButtonProps: { danger: true },
+        onOk: () => {
+          startTraining();
+        },
+      });
+      
+    } catch (error) {
+      message.error('Không thể bắt đầu training: ' + (error.response?.data?.error || error.message));
+      setTraining(false);
+      setTrainingModalVisible(false);
+    }
+  };
+
+  const startTraining = async () => {
+    try {
+      setTraining(true);
+      setTrainingProgress(0);
+      setTrainingMessage('Bắt đầu training...');
+      setTrainingModalVisible(true);
+
+      // Start training
+      await api.trainModels();
+      
+      // Poll training status
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await api.getTrainingStatus();
+          
+          setTrainingProgress(status.progress || 0);
+          setTrainingMessage(status.message || 'Đang training...');
+          
+          if (!status.is_training) {
+            clearInterval(pollInterval);
+            
+            if (status.error) {
+              message.error('Training thất bại: ' + status.error);
+            } else if (status.progress === 100) {
+              message.success('Training hoàn tất thành công!');
+              setTimeout(() => {
+                setTrainingModalVisible(false);
+              }, 2000);
+            }
+            
+            setTraining(false);
+          }
+        } catch (error) {
+          clearInterval(pollInterval);
+          message.error('Không thể lấy trạng thái training');
+          setTraining(false);
+        }
+      }, 2000); // Poll every 2 seconds
+      
+    } catch (error) {
+      message.error('Không thể bắt đầu training: ' + (error.response?.data?.error || error.message));
+      setTraining(false);
+      setTrainingModalVisible(false);
+    }
+  };
+
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
       <Card 
         title={
           <span>
             <SettingOutlined style={{ marginRight: 8 }} />
-            Cấu hình Hyperparameters cho các thuật toán ML
+            ⚙️ Cấu hình Hyperparameters cho các thuật toán Machine Learning
           </span>
         }
         extra={
@@ -112,101 +247,143 @@ const ModelConfigPage = () => {
               onConfirm={handleReset}
               okText="Đặt lại"
               cancelText="Hủy"
+              disabled={training}
             >
-              <Button icon={<ReloadOutlined />} loading={saving}>
+              <Button 
+                icon={<ReloadOutlined />} 
+                loading={saving} 
+                size="large"
+                disabled={training}
+              >
                 Đặt lại mặc định
               </Button>
             </Popconfirm>
-            <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
+            <Button 
+              type="primary" 
+              icon={<SaveOutlined />} 
+              onClick={handleSave} 
+              loading={saving} 
+              size="large"
+              disabled={training}
+            >
               Lưu cấu hình
             </Button>
           </Space>
         }
       >
         <Alert
-          message="Lưu ý quan trọng"
-          description="Sau khi thay đổi cấu hình, bạn cần chạy lại script train_model.py để train lại các model với hyperparameters mới."
-          type="warning"
+          message={
+            <span>
+              {checkConfigChanges() ? (
+                <>⚠️ Có thay đổi cấu hình chưa áp dụng</>
+              ) : (
+                <>✅ Cấu hình đã được đồng bộ</>
+              )}
+            </span>
+          }
+          description={
+            checkConfigChanges() ? (
+              <span>
+                Sau khi thay đổi cấu hình, bạn cần <strong>lưu cấu hình</strong> và <strong>train lại models</strong> để áp dụng thay đổi.
+              </span>
+            ) : (
+              <span>
+                Models hiện tại đã được training với cấu hình này. Nếu bạn thay đổi hyperparameters, hãy train lại để cập nhật models.
+              </span>
+            )
+          }
+          type={checkConfigChanges() ? "warning" : "success"}
           showIcon
           style={{ marginBottom: 24 }}
           action={
-            <Button size="small" type="link" icon={<ThunderboltOutlined />}>
-              python train_model.py
+            <Button 
+              size="small" 
+              type="primary" 
+              danger={checkConfigChanges()}
+              icon={training ? <LoadingOutlined /> : <ThunderboltOutlined />}
+              onClick={handleTrain}
+              loading={training}
+              disabled={training}
+            >
+              Train Models
             </Button>
           }
         />
 
         <Collapse accordion defaultActiveKey={['lr']}>
           {/* Logistic Regression */}
-          <Panel header={<strong>🔵 Logistic Regression</strong>} key="lr">
+          <Panel header={<strong style={{ fontSize: 16 }}>🔵 Logistic Regression</strong>} key="lr">
             <Form form={lrForm} layout="vertical">
-              <Form.Item 
-                label="Max Iterations" 
-                name="max_iter" 
-                tooltip="Số lần lặp tối đa"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={100} max={10000} step={100} style={{ width: '100%' }} />
-              </Form.Item>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <Form.Item 
+                  label="Max Iterations" 
+                  name="max_iter" 
+                  tooltip="Số lần lặp tối đa"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={100} max={10000} step={100} style={{ width: '100%' }} />
+                </Form.Item>
 
-              <Form.Item 
-                label="Solver" 
-                name="solver"
-                tooltip="Thuật toán tối ưu hóa"
-                rules={[{ required: true }]}
-              >
-                <Select>
-                  <Option value="liblinear">liblinear (small datasets)</Option>
-                  <Option value="lbfgs">lbfgs (default)</Option>
-                  <Option value="saga">saga (large datasets)</Option>
-                  <Option value="sag">sag</Option>
-                </Select>
-              </Form.Item>
+                <Form.Item 
+                  label="Solver" 
+                  name="solver"
+                  tooltip="Thuật toán tối ưu hóa"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="liblinear">liblinear (small datasets)</Option>
+                    <Option value="lbfgs">lbfgs (default)</Option>
+                    <Option value="saga">saga (large datasets)</Option>
+                    <Option value="sag">sag</Option>
+                  </Select>
+                </Form.Item>
 
-              <Form.Item 
-                label="C (Regularization)" 
-                name="C"
-                tooltip="Inverse of regularization strength. Smaller = stronger regularization"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={0.001} max={100} step={0.1} style={{ width: '100%' }} />
-              </Form.Item>
+                <Form.Item 
+                  label="C (Regularization)" 
+                  name="C"
+                  tooltip="Inverse of regularization strength. Smaller = stronger regularization"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={0.001} max={100} step={0.1} style={{ width: '100%' }} />
+                </Form.Item>
 
-              <Form.Item 
-                label="Penalty" 
-                name="penalty"
-                tooltip="Loại regularization"
-                rules={[{ required: true }]}
-              >
-                <Select>
-                  <Option value="l1">L1 (Lasso)</Option>
-                  <Option value="l2">L2 (Ridge)</Option>
-                  <Option value="elasticnet">ElasticNet</Option>
-                  <Option value="none">None</Option>
-                </Select>
-              </Form.Item>
+                <Form.Item 
+                  label="Penalty" 
+                  name="penalty"
+                  tooltip="Loại regularization"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="l1">L1 (Lasso)</Option>
+                    <Option value="l2">L2 (Ridge)</Option>
+                    <Option value="elasticnet">ElasticNet</Option>
+                    <Option value="none">None</Option>
+                  </Select>
+                </Form.Item>
 
-              <Form.Item label="Class Weight" name="class_weight">
-                <Select>
-                  <Option value="balanced">Balanced (auto)</Option>
-                  <Option value={null}>None</Option>
-                </Select>
-              </Form.Item>
+                <Form.Item label="Class Weight" name="class_weight">
+                  <Select>
+                    <Option value="balanced">Balanced (auto)</Option>
+                    <Option value={null}>None</Option>
+                  </Select>
+                </Form.Item>
 
-              <Form.Item label="Random State" name="random_state">
-                <InputNumber min={0} max={1000} style={{ width: '100%' }} />
-              </Form.Item>
+                <Form.Item label="Random State" name="random_state">
+                  <InputNumber min={0} max={1000} style={{ width: '100%' }} />
+                </Form.Item>
+              </div>
             </Form>
           </Panel>
 
           {/* Random Forest */}
-          <Panel header={<strong>🟢 Random Forest</strong>} key="rf">
+          <Panel header={<strong style={{ fontSize: 16 }}>🟢 Random Forest</strong>} key="rf">
             <Form form={rfForm} layout="vertical">
-              <Form.Item 
-                label="N Estimators" 
-                name="n_estimators"
-                tooltip="Số lượng cây quyết định"
-                rules={[{ required: true }]}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <Form.Item 
+                  label="N Estimators" 
+                  name="n_estimators"
+                  tooltip="Số lượng cây quyết định"
+                  rules={[{ required: true }]}
               >
                 <InputNumber min={10} max={1000} step={10} style={{ width: '100%' }} />
               </Form.Item>
@@ -261,15 +438,17 @@ const ModelConfigPage = () => {
               <Form.Item label="Random State" name="random_state">
                 <InputNumber min={0} max={1000} style={{ width: '100%' }} />
               </Form.Item>
+              </div>
             </Form>
           </Panel>
 
           {/* Gradient Boosting */}
-          <Panel header={<strong>🟡 Gradient Boosting</strong>} key="gb">
+          <Panel header={<strong style={{ fontSize: 16 }}>🟡 Gradient Boosting</strong>} key="gb">
             <Form form={gbForm} layout="vertical">
-              <Form.Item 
-                label="N Estimators" 
-                name="n_estimators"
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <Form.Item 
+                  label="N Estimators" 
+                  name="n_estimators"
                 tooltip="Số lượng boosting stages"
                 rules={[{ required: true }]}
               >
@@ -324,27 +503,29 @@ const ModelConfigPage = () => {
               <Form.Item label="Random State" name="random_state">
                 <InputNumber min={0} max={1000} style={{ width: '100%' }} />
               </Form.Item>
+              </div>
             </Form>
           </Panel>
 
           {/* KNN */}
-          <Panel header={<strong>🟣 K-Nearest Neighbors (KNN)</strong>} key="knn">
+          <Panel header={<strong style={{ fontSize: 16 }}>🟣 K-Nearest Neighbors (KNN)</strong>} key="knn">
             <Form form={knnForm} layout="vertical">
-              <Form.Item 
-                label="N Neighbors" 
-                name="n_neighbors"
-                tooltip="Số lượng láng giềng gần nhất"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={1} max={50} style={{ width: '100%' }} />
-              </Form.Item>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                <Form.Item 
+                  label="N Neighbors" 
+                  name="n_neighbors"
+                  tooltip="Số lượng láng giềng gần nhất"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={1} max={50} style={{ width: '100%' }} />
+                </Form.Item>
 
-              <Form.Item 
-                label="Weights" 
-                name="weights"
-                tooltip="Hàm trọng số cho predictions"
-                rules={[{ required: true }]}
-              >
+                <Form.Item 
+                  label="Weights" 
+                  name="weights"
+                  tooltip="Hàm trọng số cho predictions"
+                  rules={[{ required: true }]}
+                >
                 <Select>
                   <Option value="uniform">Uniform (all equal)</Option>
                   <Option value="distance">Distance (closer = higher weight)</Option>
@@ -396,6 +577,7 @@ const ModelConfigPage = () => {
                   <Option value="chebyshev">Chebyshev</Option>
                 </Select>
               </Form.Item>
+              </div>
             </Form>
           </Panel>
         </Collapse>
@@ -408,8 +590,8 @@ const ModelConfigPage = () => {
             <ol style={{ paddingLeft: 20, marginBottom: 0 }}>
               <li>Điều chỉnh các hyperparameters phù hợp với dữ liệu của bạn</li>
               <li>Nhấn "Lưu cấu hình" để lưu các thay đổi</li>
-              <li>Mở terminal và chạy: <code>cd ml-api && python train_model.py</code></li>
-              <li>Sau khi train xong, restart Flask API để load models mới</li>
+              <li>Nhấn nút "Train Models" trong Alert phía trên để train lại models</li>
+              <li>Sau khi train xong, các model mới sẽ được áp dụng tự động</li>
               <li>Kiểm tra metrics để so sánh hiệu suất các thuật toán</li>
             </ol>
           }
@@ -418,6 +600,51 @@ const ModelConfigPage = () => {
           style={{ marginTop: 16 }}
         />
       </Card>
+
+      {/* Training Progress Modal */}
+      <Modal
+        title={
+          <span>
+            <ThunderboltOutlined style={{ marginRight: 8, color: '#faad14' }} />
+            Đang Training Models
+          </span>
+        }
+        open={trainingModalVisible}
+        closable={!training}
+        maskClosable={false}
+        footer={null}
+        width={600}
+      >
+        <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <Spin 
+            indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />}
+            spinning={training}
+          >
+            <div style={{ marginTop: 20 }}>
+              <Progress 
+                percent={trainingProgress} 
+                status={training ? 'active' : trainingProgress === 100 ? 'success' : 'exception'}
+                strokeColor={{
+                  '0%': '#108ee9',
+                  '100%': '#87d068',
+                }}
+              />
+              <p style={{ marginTop: 16, fontSize: 16, color: '#666' }}>
+                {trainingMessage}
+              </p>
+              {training && (
+                <Alert
+                  message="Vui lòng chờ"
+                  description="Quá trình training đang diễn ra. Không được đóng trang này hoặc thực hiện các thao tác khác."
+                  type="warning"
+                  showIcon
+                  style={{ marginTop: 16, textAlign: 'left' }}
+                />
+              )}
+            </div>
+          </Spin>
+        </div>
+      </Modal>
     </div>
   );
 };

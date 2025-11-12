@@ -47,6 +47,45 @@ const api = {
     return apiClient.delete(`/predictions/history/${index}`);
   },
 
+  clearAllHistory: () => {
+    return apiClient.delete('/predictions/history');
+  },
+
+  // Config endpoints
+  getConfig: () => {
+    return apiClient.get('/config');
+  },
+
+  updateConfig: (data) => {
+    return apiClient.put('/config', data);
+  },
+
+  resetConfig: () => {
+    return apiClient.post('/config/reset');
+  },
+
+  getMetrics: () => {
+    return apiClient.get('/metrics');
+  },
+
+  // Training endpoints
+  trainModels: () => {
+    return apiClient.post('/train');
+  },
+
+  getTrainingStatus: () => {
+    return apiClient.get('/train/status');
+  },
+
+  // Validation endpoints
+  kfoldValidation: (k_folds, data_percent = 100) => {
+    return apiClient.post('/validation/kfold', { k_folds, data_percent });
+  },
+
+  getDatasetInfo: () => {
+    return apiClient.get('/validation/dataset/info');
+  },
+
   // Health check
   healthCheck: () => {
     return axios.get(`${API_BASE_URL}/health`);

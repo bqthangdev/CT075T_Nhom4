@@ -17,9 +17,11 @@ def create_app():
     # Blueprints
     from .routes.predictions import predictions_bp
     from .routes.config import config_bp
+    from .routes.validation import validation_bp
 
     app.register_blueprint(predictions_bp, url_prefix=f"/api/{app.config['API_VERSION']}/predictions")
     app.register_blueprint(config_bp, url_prefix=f"/api/{app.config['API_VERSION']}")
+    app.register_blueprint(validation_bp, url_prefix=f"/api/{app.config['API_VERSION']}/validation")
 
     # Health check
     @app.get('/health')

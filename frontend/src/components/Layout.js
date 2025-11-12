@@ -8,6 +8,7 @@ import {
   CalculatorOutlined,
   BulbOutlined,
   SettingOutlined,
+  LineChartOutlined,
   InfoCircleOutlined,
 } from '@ant-design/icons';
 import '../styles/Layout.css';
@@ -32,6 +33,11 @@ const Layout = ({ children }) => {
       key: '/history',
       icon: <HistoryOutlined />,
       label: <Link to="/history">Lịch sử</Link>,
+    },
+    {
+      key: '/validation',
+      icon: <LineChartOutlined />,
+      label: <Link to="/validation">K-Fold Validation</Link>,
     },
     {
       key: '/bmi-calculator',

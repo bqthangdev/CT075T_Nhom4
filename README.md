@@ -156,9 +156,13 @@ Mặc định frontend sẽ gọi ML API tại `http://localhost:8000` (có th�
 - UI/UX với Ant Design
 - Form nhập liệu bệnh nhân
 - Trang lịch sử và giới thiệu
+- **So sánh 4 thuật toán ML**: Logistic Regression, Random Forest, Gradient Boosting, KNN
+- **Hiển thị metrics đầy đủ**: Accuracy, Precision, Recall, F1-Score, ROC-AUC, MAE, MSE, Confusion Matrix
+- **Cấu hình Hyperparameters**: UI để cấu hình parameters cho từng thuật toán
+- **Training trực tiếp từ UI**: Nút train models với progress bar và status real-time
+- **Giao diện responsive**: Layout tối ưu cho màn hình rộng (1800px max-width)
 
 ⏳ **Đang phát triển:**
-- Tích hợp thuật toán Machine Learning
 - Kết nối MongoDB
 - Authentication & Authorization
 - Data visualization với charts
@@ -166,11 +170,47 @@ Mặc định frontend sẽ gọi ML API tại `http://localhost:8000` (có th�
 
 ## 🎯 Hướng dẫn sử dụng
 
-1. Truy cập trang chủ tại `http://localhost:3000`
+### Chuẩn đoán nguy cơ đột quỵ
+
+1. Truy cập trang chủ tại `http://localhost:3001`
 2. Nhấn "Bắt đầu chuẩn đoán" hoặc vào menu "Chuẩn đoán"
 3. Điền đầy đủ thông tin bệnh nhân vào form
 4. Nhấn nút "Chuẩn đoán" để nhận kết quả
-5. Xem lịch sử các lần chuẩn đoán tại menu "Lịch sử"
+5. Xem kết quả so sánh từ 4 thuật toán khác nhau với đầy đủ metrics
+6. Xem lịch sử các lần chuẩn đoán tại menu "Lịch sử"
+
+### Cấu hình và Training Models
+
+1. Vào menu "Cấu hình Hyperparameters"
+2. Điều chỉnh các thông số kỹ thuật cho từng thuật toán:
+   - **Logistic Regression**: max_iter, solver, C, penalty, class_weight
+   - **Random Forest**: n_estimators, max_depth, min_samples_split, max_features
+   - **Gradient Boosting**: n_estimators, learning_rate, max_depth, subsample
+   - **KNN**: n_neighbors, weights, algorithm, metric
+3. Nhấn "Lưu cấu hình" để lưu thay đổi
+4. **Nhấn nút "Train Models"** trong Alert để training lại models với config mới
+5. Theo dõi tiến trình training qua progress bar trong Modal
+6. Chờ training hoàn tất (khoảng 1-2 phút)
+7. Models mới sẽ được áp dụng tự động sau khi training xong
+
+**⚠️ Lưu ý khi training:**
+- Không được đóng trang hoặc refresh browser trong lúc training
+- Các thao tác khác sẽ bị disable trong thời gian training
+- Nếu có lỗi, kiểm tra console log hoặc thử training lại
+
+### Training thủ công (Alternative)
+
+Nếu muốn training bằng command line:
+
+```powershell
+cd ml-api
+python train_model.py
+```
+
+Sau đó restart Flask API:
+```powershell
+python run.py
+```
 
 ## ⚠️ Lưu ý quan trọng
 

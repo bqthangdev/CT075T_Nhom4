@@ -128,12 +128,12 @@ const BMICalculatorPage = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
       <Card 
         title={
           <span>
             <CalculatorOutlined style={{ marginRight: 8 }} />
-            Máy tính chỉ số BMI (Body Mass Index)
+            🧮 Công cụ tính chỉ số BMI (Body Mass Index)
           </span>
         }
       >
@@ -228,17 +228,37 @@ const BMICalculatorPage = () => {
                   }
                   subTitle={
                     <div style={{ textAlign: 'left', marginTop: 16 }}>
-                      <p><strong>Cân nặng:</strong> {result.weight} kg</p>
-                      <p><strong>Chiều cao:</strong> {result.height} cm</p>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: 16 }}>
+                        <div style={{ padding: '12px', backgroundColor: '#f0f5ff', borderRadius: '8px' }}>
+                          <strong>Cân nặng:</strong> {result.weight} kg
+                        </div>
+                        <div style={{ padding: '12px', backgroundColor: '#f0f5ff', borderRadius: '8px' }}>
+                          <strong>Chiều cao:</strong> {result.height} cm
+                        </div>
+                      </div>
                       
                       <Divider />
                       
-                      <h4>Khuyến nghị:</h4>
-                      <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
+                      <h4 style={{ marginBottom: 16 }}>💡 Khuyến nghị:</h4>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
                         {result.recommendations.map((rec, index) => (
-                          <li key={index} style={{ marginBottom: 8 }}>{rec}</li>
+                          <div 
+                            key={index} 
+                            style={{ 
+                              padding: '10px 14px', 
+                              backgroundColor: '#fff',
+                              borderRadius: '6px',
+                              border: '1px solid #d9d9d9',
+                              fontSize: 14
+                            }}
+                          >
+                            <span style={{ marginRight: 8, fontWeight: 'bold', color: result.color }}>
+                              {index + 1}.
+                            </span>
+                            {rec}
+                          </div>
                         ))}
-                      </ul>
+                      </div>
                     </div>
                   }
                 />

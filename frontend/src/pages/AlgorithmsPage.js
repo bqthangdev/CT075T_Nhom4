@@ -89,17 +89,17 @@ const AlgorithmsPage = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
       <Card 
         title={
           <span style={{ fontSize: 20 }}>
             <ExperimentOutlined style={{ marginRight: 8 }} />
-            Các thuật toán Machine Learning được sử dụng
+            🧪 Các thuật toán Machine Learning được sử dụng
           </span>
         }
       >
         <Alert
-          message="Phương pháp đánh giá đa thuật toán"
+          message="📊 Phương pháp đánh giá đa thuật toán"
           description="Hệ thống sử dụng 4 thuật toán Machine Learning khác nhau để phân tích cùng một bộ dữ liệu. Mỗi thuật toán có ưu điểm riêng và cung cấp góc nhìn khác nhau về nguy cơ đột quỵ. Kết quả cuối cùng là trung bình của tất cả các thuật toán, giúp tăng độ tin cậy và giảm thiểu sai số."
           type="info"
           showIcon
@@ -123,35 +123,67 @@ const AlgorithmsPage = () => {
               key={algo.key}
             >
               <div>
-                <p style={{ fontSize: 15, marginBottom: 16 }}>
-                  <strong>Mô tả:</strong> {algo.description}
+                <p style={{ fontSize: 15, marginBottom: 16, lineHeight: 1.6 }}>
+                  <strong>📖 Mô tả:</strong> {algo.description}
                 </p>
 
                 <Divider />
 
-                <Row gutter={16}>
+                <Row gutter={24}>
                   <Col xs={24} md={12}>
-                    <h4 style={{ color: '#52c41a' }}>✅ Ưu điểm:</h4>
-                    <ul>
-                      {algo.advantages.map((adv, idx) => (
-                        <li key={idx} style={{ marginBottom: 8 }}>{adv}</li>
-                      ))}
-                    </ul>
+                    <Card 
+                      title={<span style={{ color: '#52c41a' }}>✅ Ưu điểm</span>}
+                      size="small" 
+                      style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f', height: '100%' }}
+                    >
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {algo.advantages.map((adv, idx) => (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              padding: '8px 12px', 
+                              backgroundColor: '#fff',
+                              borderRadius: '6px',
+                              border: '1px solid #d9f7be'
+                            }}
+                          >
+                            <span style={{ marginRight: 8, fontWeight: 'bold', color: '#52c41a' }}>•</span>
+                            {adv}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
                   </Col>
                   <Col xs={24} md={12}>
-                    <h4 style={{ color: '#ff4d4f' }}>⚠️ Hạn chế:</h4>
-                    <ul>
-                      {algo.disadvantages.map((dis, idx) => (
-                        <li key={idx} style={{ marginBottom: 8 }}>{dis}</li>
-                      ))}
-                    </ul>
+                    <Card 
+                      title={<span style={{ color: '#ff4d4f' }}>⚠️ Hạn chế</span>}
+                      size="small" 
+                      style={{ backgroundColor: '#fff2e8', borderColor: '#ffbb96', height: '100%' }}
+                    >
+                      <div style={{ display: 'grid', gap: '8px' }}>
+                        {algo.disadvantages.map((dis, idx) => (
+                          <div 
+                            key={idx} 
+                            style={{ 
+                              padding: '8px 12px', 
+                              backgroundColor: '#fff',
+                              borderRadius: '6px',
+                              border: '1px solid #ffd591'
+                            }}
+                          >
+                            <span style={{ marginRight: 8, fontWeight: 'bold', color: '#ff4d4f' }}>•</span>
+                            {dis}
+                          </div>
+                        ))}
+                      </div>
+                    </Card>
                   </Col>
                 </Row>
 
                 <Divider />
 
                 <Alert
-                  message="Trường hợp sử dụng"
+                  message="🎯 Trường hợp sử dụng"
                   description={algo.useCase}
                   type="success"
                   showIcon

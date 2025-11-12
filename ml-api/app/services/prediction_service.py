@@ -159,17 +159,7 @@ class PredictionService:
         risk_level = self._risk_level(score)
         recommendations = self._recommendations(data, score)
 
-        record = {
-            **data,
-            'strokeRisk': score,
-            'prediction': risk_level,
-            'createdAt': datetime.utcnow().isoformat() + 'Z'
-        }
-        # Save to history file
-        self._history.insert(0, record)
-        self._history = self._history[:100]  # keep last 100
-        self._save_history()
-
+        # Build models array with full details
         models_arr = [
             {
                 'name': name,
@@ -179,6 +169,26 @@ class PredictionService:
             }
             for name, s in model_scores.items()
         ] if model_scores else []
+
+        record = {
+            **data,
+            'strokeRisk': score,
+            'prediction': risk_level,
+            'models': models_arr,  # Save detailed algorithm comparison
+            'recommendations': recommendations,  # Save health recommendations
+            'createdAt': datetime.utcnow().isoformat() + 'Z'
+        }
+        
+        # Always add new record (keep history of all diagnoses)
+        self._history.insert(0, record)
+        citizen_id = data.get('citizenId')
+        if citizen_id:
+            print(f"[History] Added new record for citizenId: {citizen_id}")
+        else:
+            print(f"[History] Added new record without citizenId")
+        
+        self._history = self._history[:100]  # keep last 100
+        self._save_history()
 
         return {
             'riskScore': score,
@@ -203,6 +213,17 @@ class PredictionService:
                 return False
         except Exception as e:
             print(f"[History] Failed to delete record: {e}")
+            return False
+
+    def clear_all_history(self) -> bool:
+        """Clear all history records."""
+        try:
+            self._history = []
+            self._save_history()
+            print(f"[History] Cleared all history records")
+            return True
+        except Exception as e:
+            print(f"[History] Failed to clear history: {e}")
             return False
 
     @staticmethod
