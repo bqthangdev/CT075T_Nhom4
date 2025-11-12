@@ -2,21 +2,21 @@
   {
     "name": "logistic_regression",
     "file": "app\\models\\logistic_regression.joblib",
-    "trained_at": "2025-11-12T07:18:16.163115Z"
+    "trained_at": "2025-11-12T08:22:48.143596Z"
   },
   {
     "name": "random_forest",
     "file": "app\\models\\random_forest.joblib",
-    "trained_at": "2025-11-12T07:18:17.521732Z"
+    "trained_at": "2025-11-12T08:22:49.405607Z"
   },
   {
     "name": "gradient_boosting",
     "file": "app\\models\\gradient_boosting.joblib",
-    "trained_at": "2025-11-12T07:18:18.240897Z"
+    "trained_at": "2025-11-12T08:22:50.023363Z"
   },
   {
     "name": "knn",
     "file": "app\\models\\knn.joblib",
-    "trained_at": "2025-11-12T07:18:18.587822Z"
+    "trained_at": "2025-11-12T08:22:50.280731Z"
   }
 ]

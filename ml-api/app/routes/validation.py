@@ -4,17 +4,18 @@ import pandas as pd
 import numpy as np
 from flask import Blueprint, request, jsonify
 from pathlib import Path
-from sklearn.model_selection import cross_validate, KFold
+from sklearn.model_selection import cross_validate, KFold, train_test_split, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 
 validation_bp = Blueprint('validation', __name__)
 
 CONFIG_FILE = Path('app/config/model_config.json')
-DATASET_FILE = Path('app/data/stroke_data.csv')
+DATASET_FILE = Path('app/data/healthcare-dataset-stroke-data.csv')
 
 def load_config():
     """Load model configuration"""
@@ -77,9 +78,22 @@ def get_algorithms(config=None):
 
 def preprocess_data(df):
     """Preprocess the dataset"""
+    # Make a copy to avoid modifying original
+    df = df.copy()
+    
     # Drop id column if exists
     if 'id' in df.columns:
         df = df.drop('id', axis=1)
+    
+    # Handle missing values in BMI
+    if 'bmi' in df.columns:
+        df['bmi'].fillna(df['bmi'].median(), inplace=True)
+    
+    # Fill any other missing numerical values
+    numerical_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numerical_cols:
+        if df[col].isnull().any():
+            df[col].fillna(df[col].median(), inplace=True)
     
     # Encode categorical variables
     label_encoders = {}
@@ -88,7 +102,9 @@ def preprocess_data(df):
     for col in categorical_cols:
         if col in df.columns:
             le = LabelEncoder()
-            df[col] = le.fit_transform(df[col].astype(str))
+            # Fill missing categorical values with 'Unknown' before encoding
+            df[col] = df[col].fillna('Unknown').astype(str)
+            df[col] = le.fit_transform(df[col])
             label_encoders[col] = le
     
     # Separate features and target
@@ -98,6 +114,11 @@ def preprocess_data(df):
     else:
         raise ValueError("Dataset must contain 'stroke' column")
     
+    # Final check: ensure no NaN values remain
+    if X.isnull().any().any():
+        print("[Warning] NaN values found after preprocessing, filling with 0")
+        X = X.fillna(0)
+    
     return X, y
 
 @validation_bp.route('/kfold', methods=['POST'])
@@ -106,13 +127,9 @@ def kfold_validation():
     try:
         data = request.get_json()
         k_folds = data.get('k_folds', 5)  # Default 5 folds
-        data_percent = data.get('data_percent', 100)  # Default 100% of data
         
         if k_folds < 2 or k_folds > 20:
             return jsonify({'error': 'K-Folds must be between 2 and 20'}), 400
-        
-        if data_percent < 10 or data_percent > 100:
-            return jsonify({'error': 'Data percent must be between 10 and 100'}), 400
         
         # Check if dataset exists
         if not DATASET_FILE.exists():
@@ -122,12 +139,6 @@ def kfold_validation():
         df = pd.read_csv(DATASET_FILE)
         print(f"[Validation] Loaded dataset with {len(df)} rows")
         
-        # Sample data if data_percent < 100
-        if data_percent < 100:
-            sample_size = int(len(df) * data_percent / 100)
-            df = df.sample(n=sample_size, random_state=42)
-            print(f"[Validation] Using {data_percent}% of data: {len(df)} rows")
-        
         # Preprocess
         X, y = preprocess_data(df)
         
@@ -135,12 +146,12 @@ def kfold_validation():
         config = load_config()
         algorithms = get_algorithms(config)
         
-        # Define scoring metrics
+        # Define scoring metrics with handling for imbalanced data
         scoring = {
             'accuracy': 'accuracy',
-            'precision': 'precision',
-            'recall': 'recall',
-            'f1': 'f1',
+            'precision': 'precision_macro',  # Use macro average for imbalanced data
+            'recall': 'recall_macro',
+            'f1': 'f1_macro',
             'roc_auc': 'roc_auc'
         }
         
@@ -157,7 +168,8 @@ def kfold_validation():
                     cv=kfold,
                     scoring=scoring,
                     return_train_score=True,
-                    n_jobs=-1
+                    n_jobs=-1,
+                    error_score='raise'  # Raise errors to catch them
                 )
                 
                 # Calculate statistics for each metric
@@ -196,17 +208,147 @@ def kfold_validation():
                 print(f"[Validation] {name} - Accuracy: {results[name]['accuracy']['mean']:.4f} (+/- {results[name]['accuracy']['std']:.4f})")
                 
             except Exception as e:
-                print(f"[Validation] Error in {name}: {e}")
-                results[name] = {'error': str(e)}
+                print(f"[Validation] Error in {name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                
+                # If K-Fold fails, try with Stratified K-Fold or return error
+                results[name] = {
+                    'error': str(e),
+                    'accuracy': {'mean': 0.0, 'std': 0.0, 'folds': []},
+                    'precision': {'mean': 0.0, 'std': 0.0, 'folds': []},
+                    'recall': {'mean': 0.0, 'std': 0.0, 'folds': []},
+                    'f1': {'mean': 0.0, 'std': 0.0, 'folds': []},
+                    'roc_auc': {'mean': 0.0, 'std': 0.0, 'folds': []},
+                    'train_accuracy': {'mean': 0.0, 'std': 0.0}
+                }
+        
+        print(f"[Validation] K-Fold Cross Validation completed")
         
         return jsonify({
             'k_folds': k_folds,
             'dataset_size': len(df),
-            'results': results
+            'results': results,
+            'method': 'k_fold'
         }), 200
         
     except Exception as e:
         print(f"[Validation] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@validation_bp.route('/holdout', methods=['POST'])
+def holdout_validation():
+    """
+    Holdout Validation (Train-Test Split)
+    Chia dữ liệu thành tập train và test với tỷ lệ tùy chỉnh
+    Phương pháp này phù hợp cho tất cả các thuật toán
+    """
+    try:
+        data = request.get_json()
+        test_size = data.get('test_size', 0.2)  # Mặc định 80% train, 20% test
+        random_state = data.get('random_state', 42)
+        
+        print(f"[Validation] Starting Holdout Validation with test_size={test_size}")
+        
+        if not DATASET_FILE.exists():
+            return jsonify({'error': 'Dataset not found'}), 404
+        
+        df = pd.read_csv(DATASET_FILE)
+        print(f"[Validation] Loaded dataset with {len(df)} rows")
+        
+        # Preprocess data using the same function as K-Fold
+        X, y = preprocess_data(df)
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, 
+            test_size=test_size, 
+            random_state=random_state,
+            stratify=y  # Đảm bảo tỷ lệ class giống nhau ở train và test
+        )
+        
+        print(f"[Validation] Train samples: {len(X_train)} (Stroke: {y_train.sum()}, No stroke: {(1-y_train).sum()})")
+        print(f"[Validation] Test samples: {len(X_test)} (Stroke: {y_test.sum()}, No stroke: {(1-y_test).sum()})")
+        
+        # Get configured algorithms
+        config = load_config()
+        algorithms = get_algorithms(config)
+        
+        # Evaluate each algorithm
+        results = {}
+        for name, pipeline in algorithms.items():
+            print(f"[Validation] Running Holdout for {name}...")
+            
+            try:
+                # Train
+                pipeline.fit(X_train, y_train)
+                
+                # Predict
+                y_train_pred = pipeline.predict(X_train)
+                y_test_pred = pipeline.predict(X_test)
+                y_test_proba = pipeline.predict_proba(X_test)[:, 1] if hasattr(pipeline, 'predict_proba') else None
+                
+                # Calculate metrics
+                train_metrics = {
+                    'accuracy': float(accuracy_score(y_train, y_train_pred)),
+                    'precision': float(precision_score(y_train, y_train_pred, average='macro', zero_division=0)),
+                    'recall': float(recall_score(y_train, y_train_pred, average='macro', zero_division=0)),
+                    'f1': float(f1_score(y_train, y_train_pred, average='macro', zero_division=0))
+                }
+                
+                test_metrics = {
+                    'accuracy': float(accuracy_score(y_test, y_test_pred)),
+                    'precision': float(precision_score(y_test, y_test_pred, average='macro', zero_division=0)),
+                    'recall': float(recall_score(y_test, y_test_pred, average='macro', zero_division=0)),
+                    'f1': float(f1_score(y_test, y_test_pred, average='macro', zero_division=0))
+                }
+                
+                if y_test_proba is not None:
+                    test_metrics['roc_auc'] = float(roc_auc_score(y_test, y_test_proba))
+                else:
+                    test_metrics['roc_auc'] = 0.0
+                
+                # Confusion matrix
+                cm = confusion_matrix(y_test, y_test_pred)
+                
+                results[name] = {
+                    'train_metrics': train_metrics,
+                    'test_metrics': test_metrics,
+                    'confusion_matrix': {
+                        'tn': int(cm[0][0]),
+                        'fp': int(cm[0][1]),
+                        'fn': int(cm[1][0]),
+                        'tp': int(cm[1][1])
+                    }
+                }
+                
+                print(f"[Validation] {name} - Test Accuracy: {test_metrics['accuracy']:.4f}, ROC-AUC: {test_metrics['roc_auc']:.4f}")
+                
+            except Exception as e:
+                print(f"[Validation] Error in {name}: {str(e)}")
+                import traceback
+                traceback.print_exc()
+                results[name] = {'error': str(e)}
+        
+        print(f"[Validation] Holdout Validation completed")
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'method': 'holdout',
+            'test_size': test_size,
+            'train_samples': len(X_train),
+            'test_samples': len(X_test),
+            'dataset_size': len(y)
+        }), 200
+        
+    except Exception as e:
+        print(f"[Validation] Error: {e}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 @validation_bp.route('/dataset/info', methods=['GET'])

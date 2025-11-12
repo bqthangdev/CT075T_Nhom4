@@ -5,7 +5,7 @@ const API_VERSION = process.env.REACT_APP_API_VERSION || 'v1';
 
 const apiClient = axios.create({
   baseURL: `${API_BASE_URL}/api/${API_VERSION}`,
-  timeout: 10000,
+  timeout: 600000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -78,8 +78,12 @@ const api = {
   },
 
   // Validation endpoints
-  kfoldValidation: (k_folds, data_percent = 100) => {
-    return apiClient.post('/validation/kfold', { k_folds, data_percent });
+  kfoldValidation: (k_folds) => {
+    return apiClient.post('/validation/kfold', { k_folds });
+  },
+
+  holdoutValidation: (test_size = 0.2) => {
+    return apiClient.post('/validation/holdout', { test_size });
   },
 
   getDatasetInfo: () => {

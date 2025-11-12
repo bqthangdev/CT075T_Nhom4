@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Card, Button, InputNumber, message, Spin, Alert, Table, Statistic, Row, Col, Divider, Tag, Progress } from 'antd';
-import { ThunderboltOutlined, DatabaseOutlined, LineChartOutlined, CheckCircleOutlined } from '@ant-design/icons';
+import { Card, Button, InputNumber, message, Spin, Alert, Table, Statistic, Row, Col, Divider, Tag, Progress, Radio } from 'antd';
+import { ThunderboltOutlined, DatabaseOutlined, LineChartOutlined, CheckCircleOutlined, ExperimentOutlined } from '@ant-design/icons';
 import api from '../services/api';
 
 const ValidationPage = () => {
   const [loading, setLoading] = useState(false);
+  const [validationMethod, setValidationMethod] = useState('kfold'); // 'kfold' or 'holdout'
   const [kFolds, setKFolds] = useState(5);
-  const [dataPercent, setDataPercent] = useState(100);
+  const [testSize, setTestSize] = useState(20); // Percentage
   const [results, setResults] = useState(null);
   const [datasetInfo, setDatasetInfo] = useState(null);
 
@@ -24,23 +25,26 @@ const ValidationPage = () => {
   };
 
   const handleValidation = async () => {
-    if (kFolds < 2 || kFolds > 20) {
-      message.error('K-Folds phải nằm trong khoảng từ 2 đến 20!');
-      return;
-    }
-
-    if (dataPercent < 10 || dataPercent > 100) {
-      message.error('Phần trăm dữ liệu phải nằm trong khoảng từ 10% đến 100%!');
-      return;
+    if (validationMethod === 'kfold') {
+      if (kFolds < 2 || kFolds > 20) {
+        message.error('K-Folds phải nằm trong khoảng từ 2 đến 20!');
+        return;
+      }
     }
 
     setLoading(true);
     setResults(null);
 
     try {
-      const response = await api.kfoldValidation(kFolds, dataPercent);
+      let response;
+      if (validationMethod === 'kfold') {
+        response = await api.kfoldValidation(kFolds);
+        message.success(`Hoàn thành K-Fold Cross Validation với K=${kFolds}!`);
+      } else {
+        response = await api.holdoutValidation(testSize / 100);
+        message.success(`Hoàn thành Holdout Validation với ${testSize}% test data!`);
+      }
       setResults(response);
-      message.success(`Hoàn thành K-Fold Cross Validation với K=${kFolds}, sử dụng ${dataPercent}% dữ liệu!`);
     } catch (error) {
       message.error('Không thể thực hiện validation: ' + (error.response?.data?.error || error.message));
       console.error('Validation error:', error);
@@ -65,7 +69,22 @@ const ValidationPage = () => {
       key: 'algorithm',
       fixed: 'left',
       width: 180,
-      render: (text) => <Tag color="blue" style={{ fontSize: 14 }}>{text}</Tag>,
+      render: (text, record) => (
+        <div>
+          <Tag color="blue" style={{ fontSize: 14 }}>{text}</Tag>
+          {record.error && (
+            <div style={{ marginTop: 8 }}>
+              <Alert 
+                message="Lỗi" 
+                description={record.error} 
+                type="error" 
+                showIcon 
+                style={{ fontSize: 12 }} 
+              />
+            </div>
+          )}
+        </div>
+      ),
     },
     {
       title: 'Accuracy',
@@ -180,6 +199,55 @@ const ValidationPage = () => {
   ];
 
   const expandedRowRender = (record) => {
+    // For holdout method, show confusion matrix instead of folds
+    if (results?.method === 'holdout' && record.confusion_matrix) {
+      const cm = record.confusion_matrix;
+      return (
+        <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+          <h4 style={{ marginBottom: 16 }}>📊 Confusion Matrix</h4>
+          <Row gutter={16}>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic 
+                  title="True Negative" 
+                  value={cm.tn} 
+                  valueStyle={{ color: '#52c41a' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic 
+                  title="False Positive" 
+                  value={cm.fp} 
+                  valueStyle={{ color: '#ff4d4f' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic 
+                  title="False Negative" 
+                  value={cm.fn} 
+                  valueStyle={{ color: '#ff4d4f' }}
+                />
+              </Card>
+            </Col>
+            <Col span={6}>
+              <Card size="small">
+                <Statistic 
+                  title="True Positive" 
+                  value={cm.tp} 
+                  valueStyle={{ color: '#52c41a' }}
+                />
+              </Card>
+            </Col>
+          </Row>
+        </div>
+      );
+    }
+
+    // For K-Fold method, show fold details
     const foldColumns = [
       { title: 'Fold', dataIndex: 'fold', key: 'fold', width: 80 },
       { 
@@ -233,6 +301,51 @@ const ValidationPage = () => {
   const processResults = () => {
     if (!results || !results.results) return [];
 
+    const method = results.method || validationMethod;
+
+    if (method === 'holdout') {
+      // Process holdout results
+      return Object.entries(results.results).map(([algorithm, data]) => {
+        if (data.error) {
+          return {
+            algorithm,
+            error: data.error,
+            accuracy_mean: 0,
+            accuracy_std: 0,
+            precision_mean: 0,
+            precision_std: 0,
+            recall_mean: 0,
+            recall_std: 0,
+            f1_mean: 0,
+            f1_std: 0,
+            roc_auc_mean: 0,
+            roc_auc_std: 0,
+          };
+        }
+
+        const test = data.test_metrics || {};
+        const train = data.train_metrics || {};
+        
+        return {
+          algorithm,
+          accuracy_mean: test.accuracy || 0,
+          accuracy_std: 0, // Holdout doesn't have std
+          precision_mean: test.precision || 0,
+          precision_std: 0,
+          recall_mean: test.recall || 0,
+          recall_std: 0,
+          f1_mean: test.f1 || 0,
+          f1_std: 0,
+          roc_auc_mean: test.roc_auc || 0,
+          roc_auc_std: 0,
+          train_accuracy_mean: train.accuracy || 0,
+          confusion_matrix: data.confusion_matrix,
+          foldDetails: [], // No folds in holdout
+        };
+      });
+    }
+
+    // Process K-Fold results
     return Object.entries(results.results).map(([algorithm, metrics]) => {
       if (metrics.error) {
         return {
@@ -354,50 +467,87 @@ const ValidationPage = () => {
 
         {/* Configuration */}
         <Card 
-          title="⚙️ Cấu hình K-Fold" 
+          title="⚙️ Cấu hình Validation" 
           size="small" 
           style={{ marginBottom: 24 }}
         >
-          <Row gutter={24}>
-            <Col xs={24} md={12}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
-                Số lượng Folds (K):
+          <div style={{ maxWidth: 700, margin: '0 auto' }}>
+            <div style={{ marginBottom: 24 }}>
+              <label style={{ display: 'block', marginBottom: 12, fontWeight: 'bold', fontSize: 15 }}>
+                Phương pháp đánh giá:
               </label>
-              <InputNumber
-                min={2}
-                max={20}
-                value={kFolds}
-                onChange={setKFolds}
-                style={{ width: '100%' }}
-                size="large"
+              <Radio.Group 
+                value={validationMethod} 
+                onChange={e => setValidationMethod(e.target.value)}
                 disabled={loading}
-              />
-              <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
-                Dataset sẽ được chia thành {kFolds} phần. Mỗi phần chiếm ~{(100/kFolds).toFixed(1)}% dữ liệu.
-              </div>
-            </Col>
-            <Col xs={24} md={12}>
-              <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
-                Phần trăm dữ liệu sử dụng (%):
-              </label>
-              <InputNumber
-                min={10}
-                max={100}
-                value={dataPercent}
-                onChange={setDataPercent}
-                style={{ width: '100%' }}
                 size="large"
-                disabled={loading}
-                formatter={value => `${value}%`}
-                parser={value => value.replace('%', '')}
-              />
-              <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
-                {datasetInfo && (
-                  <>Sẽ sử dụng {Math.round(datasetInfo.total_rows * dataPercent / 100)} / {datasetInfo.total_rows} mẫu dữ liệu.</>
-                )}
+                buttonStyle="solid"
+              >
+                <Radio.Button value="kfold">
+                  <LineChartOutlined /> K-Fold Cross Validation
+                </Radio.Button>
+                <Radio.Button value="holdout">
+                  <ExperimentOutlined /> Holdout Validation (Train-Test Split)
+                </Radio.Button>
+              </Radio.Group>
+            </div>
+
+            <Divider />
+
+            {validationMethod === 'kfold' ? (
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                  Số lượng Folds (K):
+                </label>
+                <InputNumber
+                  min={2}
+                  max={20}
+                  value={kFolds}
+                  onChange={setKFolds}
+                  style={{ width: '100%' }}
+                  size="large"
+                  disabled={loading}
+                />
+                <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                  Dataset sẽ được chia thành {kFolds} phần. Mỗi phần chiếm ~{(100/kFolds).toFixed(1)}% dữ liệu.
+                  {datasetInfo && (
+                    <> ({Math.round(datasetInfo.total_rows / kFolds)} mẫu/fold)</>
+                  )}
+                </div>
               </div>
-            </Col>
-          </Row>
+            ) : (
+              <div>
+                <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
+                  Tỷ lệ Test Data (%):
+                </label>
+                <InputNumber
+                  min={10}
+                  max={50}
+                  value={testSize}
+                  onChange={setTestSize}
+                  style={{ width: '100%' }}
+                  size="large"
+                  disabled={loading}
+                  formatter={value => `${value}%`}
+                  parser={value => value.replace('%', '')}
+                  placeholder="Nhập tỷ lệ test data (10-50%)"
+                />
+                <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                  Train: {100 - testSize}% | Test: {testSize}%
+                  {datasetInfo && (
+                    <> (Train: {Math.round(datasetInfo.total_rows * (100 - testSize) / 100)} mẫu, Test: {Math.round(datasetInfo.total_rows * testSize / 100)} mẫu)</>
+                  )}
+                </div>
+                <Alert
+                  message="Holdout Validation"
+                  description="Chia dữ liệu thành 2 phần cố định: Training và Testing. Đơn giản, nhanh, phù hợp khi có dataset lớn. Phương pháp này hoạt động ổn định với mọi thuật toán."
+                  type="info"
+                  showIcon
+                  style={{ marginTop: 16 }}
+                />
+              </div>
+            )}
+          </div>
           <Divider />
           <div style={{ textAlign: 'center' }}>
             <Button
@@ -418,10 +568,10 @@ const ValidationPage = () => {
           <Card style={{ textAlign: 'center', padding: '40px' }}>
             <Spin size="large" />
             <p style={{ marginTop: 20, fontSize: 16 }}>
-              Đang thực hiện K-Fold Cross Validation...
+              Đang thực hiện {validationMethod === 'kfold' ? 'K-Fold Cross Validation' : 'Holdout Validation'}...
             </p>
             <p style={{ color: '#666' }}>
-              Quá trình này có thể mất vài phút tùy thuộc vào số lượng folds và độ phức tạp của models.
+              Quá trình này có thể mất vài phút tùy thuộc vào cấu hình và độ phức tạp của models.
             </p>
           </Card>
         )}
@@ -435,7 +585,11 @@ const ValidationPage = () => {
             </Divider>
 
             <Alert
-              message={`Hoàn thành với K=${results.k_folds} folds trên ${results.dataset_size} mẫu dữ liệu`}
+              message={
+                results.method === 'holdout' 
+                  ? `Hoàn thành Holdout Validation: ${results.train_samples || 0} mẫu train, ${results.test_samples || 0} mẫu test`
+                  : `Hoàn thành K-Fold với K=${results.k_folds} trên ${results.dataset_size} mẫu dữ liệu`
+              }
               type="success"
               showIcon
               style={{ marginBottom: 16 }}
@@ -446,15 +600,29 @@ const ValidationPage = () => {
                 columns={columns}
                 dataSource={processResults()}
                 rowKey="algorithm"
-                scroll={{ x: 1200 }}
+                scroll={{ x: 1600 }}
                 expandable={{
                   expandedRowRender,
                   expandIcon: ({ expanded, onExpand, record }) => 
                     expanded ? (
-                      <Button size="small" onClick={e => onExpand(record, e)}>Ẩn chi tiết</Button>
+                      <Button 
+                        size="small" 
+                        onClick={e => onExpand(record, e)}
+                        style={{ marginRight: 8 }}
+                      >
+                        Ẩn chi tiết
+                      </Button>
                     ) : (
-                      <Button size="small" type="primary" onClick={e => onExpand(record, e)}>Xem chi tiết</Button>
-                    )
+                      <Button 
+                        size="small" 
+                        type="primary" 
+                        onClick={e => onExpand(record, e)}
+                        style={{ marginRight: 8 }}
+                      >
+                        Xem chi tiết
+                      </Button>
+                    ),
+                  columnWidth: 120,
                 }}
                 pagination={false}
               />

@@ -372,36 +372,28 @@ const HistoryPage = () => {
         {filteredHistory.length > 0 && (
           <Card size="small" style={{ marginBottom: 16, backgroundColor: '#f0f5ff' }}>
             <Row gutter={16}>
-              <Col xs={12} sm={6}>
+              <Col xs={24} sm={8}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>
+                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#52c41a' }}>
                     {filteredHistory.filter(h => h.prediction === 'Low Risk').length}
                   </div>
-                  <div style={{ fontSize: 12, color: '#666' }}>Low Risk</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Low Risk</div>
                 </div>
               </Col>
-              <Col xs={12} sm={6}>
+              <Col xs={24} sm={8}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#faad14' }}>
+                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#faad14' }}>
                     {filteredHistory.filter(h => h.prediction === 'Medium Risk').length}
                   </div>
-                  <div style={{ fontSize: 12, color: '#666' }}>Medium Risk</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Medium Risk</div>
                 </div>
               </Col>
-              <Col xs={12} sm={6}>
+              <Col xs={24} sm={8}>
                 <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#ff4d4f' }}>
+                  <div style={{ fontSize: 28, fontWeight: 'bold', color: '#ff4d4f' }}>
                     {filteredHistory.filter(h => h.prediction === 'High Risk').length}
                   </div>
-                  <div style={{ fontSize: 12, color: '#666' }}>High Risk</div>
-                </div>
-              </Col>
-              <Col xs={12} sm={6}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#1890ff' }}>
-                    {filteredHistory.filter(h => h.citizenId).length}
-                  </div>
-                  <div style={{ fontSize: 12, color: '#666' }}>Có CCCD</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>High Risk</div>
                 </div>
               </Col>
             </Row>
