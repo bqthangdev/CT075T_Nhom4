@@ -1,0 +1,78 @@
+{
+  "logistic_regression": {
+    "roc_auc": 0.8431531196943972,
+    "accuracy": 0.7316118935837246,
+    "f1_score": 0.2222222222222222,
+    "precision": 0.12928759894459102,
+    "recall": 0.7903225806451613,
+    "mae": 0.2683881064162754,
+    "mse": 0.2683881064162754,
+    "mae_proba": 0.30774969228235416,
+    "mse_proba": 0.17402352039700578,
+    "confusion_matrix": {
+      "true_negative": 886,
+      "false_positive": 330,
+      "false_negative": 13,
+      "true_positive": 49
+    },
+    "specificity": 0.7286184210526315,
+    "sensitivity": 0.7903225806451613
+  },
+  "random_forest": {
+    "roc_auc": 0.7824570246179967,
+    "accuracy": 0.9491392801251957,
+    "f1_score": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "mae": 0.05086071987480438,
+    "mse": 0.05086071987480438,
+    "mae_proba": 0.08599374021909234,
+    "mse_proba": 0.04602015301686663,
+    "confusion_matrix": {
+      "true_negative": 1213,
+      "false_positive": 3,
+      "false_negative": 62,
+      "true_positive": 0
+    },
+    "specificity": 0.9975328947368421,
+    "sensitivity": 0.0
+  },
+  "gradient_boosting": {
+    "roc_auc": 0.8200604838709679,
+    "accuracy": 0.9499217527386542,
+    "f1_score": 0.030303030303030304,
+    "precision": 0.25,
+    "recall": 0.016129032258064516,
+    "mae": 0.050078247261345854,
+    "mse": 0.050078247261345854,
+    "mae_proba": 0.08115014889980512,
+    "mse_proba": 0.04272067314016656,
+    "confusion_matrix": {
+      "true_negative": 1213,
+      "false_positive": 3,
+      "false_negative": 61,
+      "true_positive": 1
+    },
+    "specificity": 0.9975328947368421,
+    "sensitivity": 0.016129032258064516
+  },
+  "knn": {
+    "roc_auc": 0.7656780560271648,
+    "accuracy": 0.9514866979655712,
+    "f1_score": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "mae": 0.048513302034428794,
+    "mse": 0.048513302034428794,
+    "mae_proba": 0.08320292123109024,
+    "mse_proba": 0.04431577117023127,
+    "confusion_matrix": {
+      "true_negative": 1216,
+      "false_positive": 0,
+      "false_negative": 62,
+      "true_positive": 0
+    },
+    "specificity": 1.0,
+    "sensitivity": 0.0
+  }
+}
