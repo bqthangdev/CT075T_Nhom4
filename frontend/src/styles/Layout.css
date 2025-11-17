@@ -1,13 +1,101 @@
 .layout {
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
 .logo {
   float: left;
   margin-right: 40px;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+}
+
+.logo h2 {
+  white-space: nowrap;
+  transition: color 0.3s;
+}
+
+.logo:hover h2 {
+  color: #1890ff !important;
 }
 
 .ant-layout-header {
   display: flex;
   align-items: center;
+  padding: 0 24px;
+}
+
+/* Mobile menu button - hidden by default */
+.mobile-menu-button {
+  display: none;
+}
+
+/* Desktop menu - visible by default */
+.desktop-menu {
+  display: flex !important;
+}
+
+/* Mobile menu dropdown styling */
+.mobile-menu-dropdown {
+  min-width: 200px;
+}
+
+.mobile-menu-dropdown .ant-dropdown-menu {
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+}
+
+.mobile-menu-dropdown .ant-dropdown-menu-item {
+  padding: 12px 16px;
+}
+
+.mobile-menu-dropdown .ant-dropdown-menu-item a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Responsive menu */
+@media (max-width: 992px) {
+  .ant-layout-header {
+    padding: 0 16px;
+  }
+  
+  .logo {
+    margin-right: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .ant-layout-header {
+    padding: 0 12px;
+  }
+  
+  .logo {
+    margin-right: 12px;
+    max-width: 180px;
+    flex: 1;
+  }
+  
+  /* Hide desktop menu on mobile */
+  .desktop-menu {
+    display: none !important;
+  }
+  
+  /* Show mobile menu button */
+  .mobile-menu-button {
+    display: inline-flex !important;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 576px) {
+  .logo {
+    margin-right: 8px;
+    max-width: 150px;
+  }
+  
+  .ant-layout-header {
+    padding: 0 8px;
+  }
 }

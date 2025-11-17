@@ -135,10 +135,16 @@ class PredictionService:
         # Try models first
         model_scores = self._predict_with_models(adapted)
 
-        # Aggregate average probability when available
+        # Use Logistic Regression as the most reliable model for final diagnosis
+        # It's properly calibrated with class_weight='balanced' for imbalanced data
         score = None
         if model_scores:
-            score = sum(model_scores.values()) / len(model_scores)
+            # Prefer logistic_regression as it's the most reliable for stroke prediction
+            if 'logistic_regression' in model_scores:
+                score = model_scores['logistic_regression']
+            else:
+                # Fallback to average if logistic_regression not available
+                score = sum(model_scores.values()) / len(model_scores)
 
         # Fallback heuristic if no model available
         if score is None:
@@ -159,13 +165,12 @@ class PredictionService:
         risk_level = self._risk_level(score)
         recommendations = self._recommendations(data, score)
 
-        # Build models array with full details
+        # Build models array with risk scores only (no training metrics)
         models_arr = [
             {
                 'name': name,
                 'riskScore': s,
-                'riskLevel': self._risk_level(s),
-                'metrics': self._metrics.get(name, {})
+                'riskLevel': self._risk_level(s)
             }
             for name, s in model_scores.items()
         ] if model_scores else []
@@ -213,6 +218,31 @@ class PredictionService:
                 return False
         except Exception as e:
             print(f"[History] Failed to delete record: {e}")
+            return False
+
+    def delete_multiple_records(self, indices: List[int]) -> bool:
+        """Delete multiple history records by indices."""
+        try:
+            # Sort indices in descending order to avoid index shifting during deletion
+            sorted_indices = sorted(set(indices), reverse=True)
+            
+            # Validate all indices first
+            for idx in sorted_indices:
+                if idx < 0 or idx >= len(self._history):
+                    print(f"[History] Invalid index {idx}")
+                    return False
+            
+            # Delete records
+            deleted_count = 0
+            for idx in sorted_indices:
+                del self._history[idx]
+                deleted_count += 1
+            
+            self._save_history()
+            print(f"[History] Deleted {deleted_count} records")
+            return True
+        except Exception as e:
+            print(f"[History] Failed to delete multiple records: {e}")
             return False
 
     def clear_all_history(self) -> bool:

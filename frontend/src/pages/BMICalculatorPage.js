@@ -128,12 +128,12 @@ const BMICalculatorPage = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ margin: '0 auto', padding: '0 clamp(12px, 2vw, 24px)' }}>
       <Card 
         title={
           <span>
             <CalculatorOutlined style={{ marginRight: 8 }} />
-            🧮 Công cụ tính chỉ số BMI (Body Mass Index)
+            Công cụ tính chỉ số BMI (Body Mass Index)
           </span>
         }
       >
@@ -228,7 +228,7 @@ const BMICalculatorPage = () => {
                   }
                   subTitle={
                     <div style={{ textAlign: 'left', marginTop: 16 }}>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', marginBottom: 16 }}>
+                      <div className="responsive-grid-2" style={{ marginBottom: 16 }}>
                         <div style={{ padding: '12px', backgroundColor: '#f0f5ff', borderRadius: '8px' }}>
                           <strong>Cân nặng:</strong> {result.weight} kg
                         </div>
@@ -240,7 +240,7 @@ const BMICalculatorPage = () => {
                       <Divider />
                       
                       <h4 style={{ marginBottom: 16 }}>💡 Khuyến nghị:</h4>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '12px' }}>
+                      <div className="responsive-grid-2" style={{ gap: '12px' }}>
                         {result.recommendations.map((rec, index) => (
                           <div 
                             key={index} 

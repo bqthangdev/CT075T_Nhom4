@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Form, Input, Select, Button, InputNumber, message, Spin, Table, Tag, Tooltip, Alert, Divider } from 'antd';
+import { Card, Form, Input, Select, Button, InputNumber, message, Spin, Table, Tag, Tooltip, Alert, Divider, Row, Col } from 'antd';
 import { getRiskLabelVi, getRiskColor, getRiskColorByScore } from '../utils/riskUtils';
 import { QuestionCircleOutlined, FilePdfOutlined, DownloadOutlined } from '@ant-design/icons';
 import api from '../services/api';
@@ -114,7 +114,7 @@ const PredictionPage = () => {
   };
 
   return (
-    <div style={{ margin: '0 auto', padding: '0 16px' }}>
+    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
       {isBlocked && (
         <Alert
           message="Vui lòng thực hiện chậm lại"
@@ -146,7 +146,7 @@ const PredictionPage = () => {
           <Divider orientation="left" style={{ fontSize: '16px', fontWeight: 'bold', color: '#1890ff' }}>
             📋 Thông tin cá nhân
           </Divider>
-          <div className="responsive-grid-3">
+          <Row gutter={[16, 16]}>
             <Form.Item
               label={
                 <span>
@@ -322,7 +322,7 @@ const PredictionPage = () => {
           <Divider orientation="left" style={{ fontSize: '16px', fontWeight: 'bold', color: '#52c41a', marginTop: '24px' }}>
             🏥 Hồ sơ y tế
           </Divider>
-          <div className="responsive-grid-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <Form.Item 
               label={
                 <span>
@@ -384,7 +384,7 @@ const PredictionPage = () => {
           <Divider orientation="left" style={{ fontSize: '16px', fontWeight: 'bold', color: '#fa8c16', marginTop: '24px' }}>
             📊 Chỉ số sức khỏe
           </Divider>
-          <div className="responsive-grid-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
             <Form.Item
               label={
                 <span>
@@ -480,7 +480,7 @@ const PredictionPage = () => {
               </Button>
             }
           >
-            <div className="responsive-grid-2">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '24px' }}>
               <div>
                 <strong style={{ fontSize: 16 }}>Mức độ rủi ro:</strong>
                 <Tag 
@@ -590,7 +590,7 @@ const PredictionPage = () => {
               title="💡 Khuyến nghị" 
               style={{ marginTop: 20, backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}
             >
-              <div className="responsive-grid-2">
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
                 {result.recommendations.map((rec, index) => (
                   <div 
                     key={index} 

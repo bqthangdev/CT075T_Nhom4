@@ -25,8 +25,9 @@ class PredictionService {
   }
   
   calculateRiskLevel(score) {
-    if (score < 0.3) return 'Low Risk';
-    if (score < 0.7) return 'Medium Risk';
+    // Keep thresholds consistent across apps (0.33 / 0.66)
+    if (score < 0.33) return 'Low Risk';
+    if (score < 0.66) return 'Medium Risk';
     return 'High Risk';
   }
   

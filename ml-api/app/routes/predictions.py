@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, current_app
 from http import HTTPStatus
 from ..services.prediction_service import PredictionService
 
@@ -8,6 +8,10 @@ service = PredictionService()
 
 @predictions_bp.post('/predict')
 def predict():
+    limiter = current_app.limiter
+    # Apply strict rate limit: 5 predictions per minute per IP to prevent spam
+    limiter.limit("5 per minute")(lambda: None)()
+    
     try:
         payload = request.get_json(force=True, silent=False) or {}
         result = service.predict(payload)
@@ -57,6 +61,36 @@ def delete_history(index):
                 'success': False,
                 'error': 'Invalid index or record not found'
             }, HTTPStatus.NOT_FOUND
+    except Exception as e:
+        return {
+            'success': False,
+            'error': str(e)
+        }, HTTPStatus.INTERNAL_SERVER_ERROR
+
+
+@predictions_bp.post('/history/delete-multiple')
+def delete_multiple_history():
+    try:
+        payload = request.get_json(force=True, silent=False) or {}
+        indices = payload.get('indices', [])
+        
+        if not isinstance(indices, list) or not indices:
+            return {
+                'success': False,
+                'error': 'Invalid or empty indices list'
+            }, HTTPStatus.BAD_REQUEST
+        
+        success = service.delete_multiple_records(indices)
+        if success:
+            return {
+                'success': True,
+                'message': f'Deleted {len(indices)} history records successfully'
+            }, HTTPStatus.OK
+        else:
+            return {
+                'success': False,
+                'error': 'Failed to delete records or invalid indices'
+            }, HTTPStatus.BAD_REQUEST
     except Exception as e:
         return {
             'success': False,

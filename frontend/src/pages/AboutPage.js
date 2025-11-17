@@ -11,7 +11,7 @@ const AboutPage = () => {
           <Title level={2}>Giới thiệu về dự án</Title>
           
           <Paragraph>
-            Hệ thống chuẩn đoán nguy cơ đột quỵ là một ứng dụng web sử dụng công nghệ
+            Hệ thống chẩn đoán nguy cơ đột quỵ là một ứng dụng web sử dụng công nghệ
             học máy (Machine Learning) để dự đoán khả năng mắc bệnh đột quỵ dựa trên
             các thông tin sức khỏe và lối sống của bệnh nhân.
           </Paragraph>
@@ -21,7 +21,7 @@ const AboutPage = () => {
           <Title level={3}>Mục tiêu</Title>
           <Paragraph>
             <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
-              <li>Cung cấp công cụ hỗ trợ chuẩn đoán sớm nguy cơ đột quỵ</li>
+              <li>Cung cấp công cụ hỗ trợ chẩn đoán sớm nguy cơ đột quỵ</li>
               <li>Nâng cao nhận thức về các yếu tố nguy cơ</li>
               <li>Hỗ trợ bác sĩ trong quá trình đánh giá sức khỏe bệnh nhân</li>
             </ul>

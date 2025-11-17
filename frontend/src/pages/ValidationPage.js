@@ -206,7 +206,7 @@ const ValidationPage = () => {
         <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
           <h4 style={{ marginBottom: 16 }}>📊 Confusion Matrix</h4>
           <Row gutter={16}>
-            <Col span={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card size="small">
                 <Statistic 
                   title="True Negative" 
@@ -215,7 +215,7 @@ const ValidationPage = () => {
                 />
               </Card>
             </Col>
-            <Col span={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card size="small">
                 <Statistic 
                   title="False Positive" 
@@ -224,7 +224,7 @@ const ValidationPage = () => {
                 />
               </Card>
             </Col>
-            <Col span={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card size="small">
                 <Statistic 
                   title="False Negative" 
@@ -233,7 +233,7 @@ const ValidationPage = () => {
                 />
               </Card>
             </Col>
-            <Col span={6}>
+            <Col xs={12} sm={12} md={6}>
               <Card size="small">
                 <Statistic 
                   title="True Positive" 
@@ -293,6 +293,7 @@ const ValidationPage = () => {
           pagination={false}
           size="small"
           bordered
+          scroll={{ x: 'max-content' }}
         />
       </div>
     );
@@ -398,12 +399,12 @@ const ValidationPage = () => {
   };
 
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ margin: '0 auto', padding: '0 clamp(12px, 2vw, 24px)' }}>
       <Card
         title={
           <span style={{ fontSize: 20 }}>
             <LineChartOutlined style={{ marginRight: 8 }} />
-            📊 K-Fold Cross Validation - Kiểm tra độ chính xác Model
+            K-Fold Cross Validation - Kiểm tra độ chính xác Model
           </span>
         }
       >
@@ -471,7 +472,7 @@ const ValidationPage = () => {
           size="small" 
           style={{ marginBottom: 24 }}
         >
-          <div style={{ maxWidth: 700, margin: '0 auto' }}>
+          <div style={{ margin: '0 auto' }}>
             <div style={{ marginBottom: 24 }}>
               <label style={{ display: 'block', marginBottom: 12, fontWeight: 'bold', fontSize: 15 }}>
                 Phương pháp đánh giá:
@@ -482,12 +483,13 @@ const ValidationPage = () => {
                 disabled={loading}
                 size="large"
                 buttonStyle="solid"
+                style={{ width: '100%', display: 'flex', flexWrap: 'wrap', gap: '8px' }}
               >
-                <Radio.Button value="kfold">
-                  <LineChartOutlined /> K-Fold Cross Validation
+                <Radio.Button value="kfold" style={{ flex: '1 1 auto', textAlign: 'center', minWidth: '200px' }}>
+                  <LineChartOutlined /> <span className="radio-text">K-Fold Cross Validation</span>
                 </Radio.Button>
-                <Radio.Button value="holdout">
-                  <ExperimentOutlined /> Holdout Validation (Train-Test Split)
+                <Radio.Button value="holdout" style={{ flex: '1 1 auto', textAlign: 'center', minWidth: '200px' }}>
+                  <ExperimentOutlined /> <span className="radio-text">Holdout Validation</span>
                 </Radio.Button>
               </Radio.Group>
             </div>
@@ -556,7 +558,7 @@ const ValidationPage = () => {
               icon={loading ? <Spin /> : <ThunderboltOutlined />}
               onClick={handleValidation}
               loading={loading}
-              style={{ height: 60, fontSize: 16, minWidth: 250 }}
+              style={{ height: 60, fontSize: 16, width: '100%', maxWidth: 400 }}
             >
               {loading ? 'Đang xử lý...' : 'Bắt đầu Validation'}
             </Button>
@@ -600,7 +602,7 @@ const ValidationPage = () => {
                 columns={columns}
                 dataSource={processResults()}
                 rowKey="algorithm"
-                scroll={{ x: 1600 }}
+                scroll={{ x: 'max-content' }}
                 expandable={{
                   expandedRowRender,
                   expandIcon: ({ expanded, onExpand, record }) => 

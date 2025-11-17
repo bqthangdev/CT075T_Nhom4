@@ -231,90 +231,93 @@ const ModelConfigPage = () => {
   };
 
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ margin: '0 auto', padding: '0 16px' }}>
       <Card 
         title={
-          <span>
-            <SettingOutlined style={{ marginRight: 8 }} />
-            ⚙️ Cấu hình Hyperparameters cho các thuật toán Machine Learning
-          </span>
-        }
-        extra={
-          <Space>
-            <Popconfirm
-              title="Đặt lại cấu hình?"
-              description="Bạn có chắc muốn đặt lại về cấu hình mặc định?"
-              onConfirm={handleReset}
-              okText="Đặt lại"
-              cancelText="Hủy"
-              disabled={training}
-            >
-              <Button 
-                icon={<ReloadOutlined />} 
-                loading={saving} 
-                size="large"
+          <div className="model-config-header">
+            <div className="model-config-title">
+              <SettingOutlined style={{ marginRight: 8 }} />
+              Cấu hình Hyperparameters
+            </div>
+            <Space wrap size="small" className="card-actions-mobile">
+              <Popconfirm
+                title="Đặt lại cấu hình?"
+                description="Bạn có chắc muốn đặt lại về cấu hình mặc định?"
+                onConfirm={handleReset}
+                okText="Đặt lại"
+                cancelText="Hủy"
                 disabled={training}
               >
-                Đặt lại mặc định
+                <Button 
+                  icon={<ReloadOutlined />} 
+                  loading={saving} 
+                  size="small"
+                  disabled={training}
+                >
+                  Đặt lại
+                </Button>
+              </Popconfirm>
+              <Button 
+                type="primary" 
+                icon={<SaveOutlined />} 
+                onClick={handleSave} 
+                loading={saving} 
+                size="small"
+                disabled={training}
+              >
+                Lưu
               </Button>
-            </Popconfirm>
-            <Button 
-              type="primary" 
-              icon={<SaveOutlined />} 
-              onClick={handleSave} 
-              loading={saving} 
-              size="large"
-              disabled={training}
-            >
-              Lưu cấu hình
-            </Button>
-          </Space>
+            </Space>
+          </div>
         }
+        
       >
         <Alert
           message={
             <span>
               {checkConfigChanges() ? (
-                <>⚠️ Có thay đổi cấu hình chưa áp dụng</>
+                <>⚠️ Có thay đổi chưa áp dụng</>
               ) : (
-                <>✅ Cấu hình đã được đồng bộ</>
+                <>✅ Cấu hình đã đồng bộ</>
               )}
             </span>
           }
           description={
             checkConfigChanges() ? (
               <span>
-                Sau khi thay đổi cấu hình, bạn cần <strong>lưu cấu hình</strong> và <strong>train lại models</strong> để áp dụng thay đổi.
+                Cần <strong>lưu cấu hình</strong> và <strong>train lại</strong> để áp dụng.
               </span>
             ) : (
               <span>
-                Models hiện tại đã được training với cấu hình này. Nếu bạn thay đổi hyperparameters, hãy train lại để cập nhật models.
+                Models đã được training với cấu hình này. Nếu thay đổi, hãy train lại.
               </span>
             )
           }
           type={checkConfigChanges() ? "warning" : "success"}
           showIcon
-          style={{ marginBottom: 24 }}
-          action={
-            <Button 
-              size="small" 
-              type="primary" 
-              danger={checkConfigChanges()}
-              icon={training ? <LoadingOutlined /> : <ThunderboltOutlined />}
-              onClick={handleTrain}
-              loading={training}
-              disabled={training}
-            >
-              Train Models
-            </Button>
-          }
+          style={{ marginBottom: 16 }}
         />
+
+        <div style={{ marginBottom: 24, textAlign: 'center' }}>
+          <Button 
+            size="large" 
+            type="primary" 
+            danger={checkConfigChanges()}
+            icon={training ? <LoadingOutlined /> : <ThunderboltOutlined />}
+            onClick={handleTrain}
+            loading={training}
+            disabled={training}
+            style={{ minWidth: 200 }}
+          >
+            {training ? 'Đang Training...' : 'Train Models'}
+          </Button>
+        </div>
 
         <Collapse accordion defaultActiveKey={['lr']}>
           {/* Logistic Regression */}
           <Panel header={<strong style={{ fontSize: 16 }}>🔵 Logistic Regression</strong>} key="lr">
             <Form form={lrForm} layout="vertical">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="responsive-grid-3">
                 <Form.Item 
                   label="Max Iterations" 
                   name="max_iter" 
@@ -378,7 +381,7 @@ const ModelConfigPage = () => {
           {/* Random Forest */}
           <Panel header={<strong style={{ fontSize: 16 }}>🟢 Random Forest</strong>} key="rf">
             <Form form={rfForm} layout="vertical">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="responsive-grid-3">
                 <Form.Item 
                   label="N Estimators" 
                   name="n_estimators"
@@ -445,7 +448,7 @@ const ModelConfigPage = () => {
           {/* Gradient Boosting */}
           <Panel header={<strong style={{ fontSize: 16 }}>🟡 Gradient Boosting</strong>} key="gb">
             <Form form={gbForm} layout="vertical">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="responsive-grid-3">
                 <Form.Item 
                   label="N Estimators" 
                   name="n_estimators"
@@ -510,7 +513,7 @@ const ModelConfigPage = () => {
           {/* KNN */}
           <Panel header={<strong style={{ fontSize: 16 }}>🟣 K-Nearest Neighbors (KNN)</strong>} key="knn">
             <Form form={knnForm} layout="vertical">
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="responsive-grid-3">
                 <Form.Item 
                   label="N Neighbors" 
                   name="n_neighbors"

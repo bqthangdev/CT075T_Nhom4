@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Card, Table, message, Button, Modal, Form, InputNumber, Select, Tag, Spin, Popconfirm, Space, Divider, Alert, Input, DatePicker, Row, Col } from 'antd';
-import { EyeOutlined, DeleteOutlined, ClearOutlined, SearchOutlined, FilterOutlined, DownloadOutlined } from '@ant-design/icons';
+import { getRiskLabelVi, getRiskColor, getRiskColorByScore } from '../utils/riskUtils';
+import { EyeOutlined, DeleteOutlined, ClearOutlined, SearchOutlined, FilterOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
 import api from '../services/api';
+import { downloadBlob } from '../utils/helpers';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -15,6 +17,10 @@ const HistoryPage = () => {
   const [predicting, setPredicting] = useState(false);
   const [newResult, setNewResult] = useState(null);
   const [form] = Form.useForm();
+  const [generatingReport, setGeneratingReport] = useState(false);
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
+  const [selectedRowKeys, setSelectedRowKeys] = useState([]);
+  const [deletingMultiple, setDeletingMultiple] = useState(false);
 
   // Filter states
   const [searchText, setSearchText] = useState('');
@@ -42,6 +48,15 @@ const HistoryPage = () => {
     applyFilters();
   }, [history, debouncedSearchText, filterRisk, filterGender, dateRange]);
 
+  // Ensure current page is valid when filtered data changes
+  useEffect(() => {
+    const total = filteredHistory.length;
+    const maxPage = Math.max(1, Math.ceil(total / pagination.pageSize));
+    if (pagination.current > maxPage) {
+      setPagination((p) => ({ ...p, current: 1 }));
+    }
+  }, [filteredHistory, pagination.pageSize]);
+
   const fetchHistory = async () => {
     setLoading(true);
     try {
@@ -49,7 +64,7 @@ const HistoryPage = () => {
       setHistory(response.data);
       setFilteredHistory(response.data);
     } catch (error) {
-      message.error('Không thể tải lịch sử chuẩn đoán');
+      message.error('Không thể tải lịch sử chẩn đoán');
       console.error('Fetch history error:', error);
     } finally {
       setLoading(false);
@@ -126,7 +141,7 @@ const HistoryPage = () => {
       const link = document.createElement('a');
       const url = URL.createObjectURL(blob);
       link.setAttribute('href', url);
-      link.setAttribute('download', `lich-su-chuan-doan-${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute('download', `lich-su-chan-doan-${new Date().toISOString().split('T')[0]}.csv`);
       link.style.visibility = 'hidden';
       document.body.appendChild(link);
       link.click();
@@ -177,16 +192,69 @@ const HistoryPage = () => {
       // Reload history to update the table with new record
       await fetchHistory();
       
-      message.success('Chuẩn đoán lại thành công! Bản ghi mới đã được thêm vào lịch sử.');
+      message.success('Chẩn đoán lại thành công! Bản ghi mới đã được thêm vào lịch sử.');
     } catch (error) {
       if (error.errorFields) {
         message.error('Vui lòng kiểm tra lại thông tin!');
+      } else if (error?.response?.status === 429) {
+        message.warning('Vui lòng thực hiện chậm lại');
       } else {
-        message.error('Có lỗi xảy ra khi chuẩn đoán');
+        message.error('Có lỗi xảy ra khi chẩn đoán');
         console.error('Re-predict error:', error);
       }
     } finally {
       setPredicting(false);
+    }
+  };
+
+  const handleGenerateReport = async (record) => {
+    if (!record) {
+      message.error('Không có dữ liệu để tạo báo cáo');
+      return;
+    }
+
+    setGeneratingReport(true);
+    try {
+      // Prepare patient data from history record
+      const patientData = {
+        patientName: record.patientName || 'N/A',
+        // Ensure CCCD is included; prefer citizenId, fallback to patientId
+        citizenId: record.citizenId || record.patientId || 'N/A',
+        // Keep legacy field for backward compatibility
+        patientId: record.patientId || record.citizenId || 'N/A',
+        age: record.age,
+        gender: record.gender,
+        hypertension: record.hypertension,
+        heartDisease: record.heartDisease,
+        everMarried: record.everMarried,
+        workType: record.workType,
+        residenceType: record.residenceType,
+        avgGlucoseLevel: record.avgGlucoseLevel,
+        bmi: record.bmi,
+        smokingStatus: record.smokingStatus
+      };
+
+      const predictionResult = {
+        riskScore: record.strokeRisk,
+        riskLevel: record.prediction,
+        models: record.models || [],
+        recommendations: record.recommendations || []
+      };
+
+      const blob = await api.generateReport(patientData, predictionResult);
+      const ok = downloadBlob(blob, `Bao_cao_chan_doan_${record.patientName || 'patient'}_${new Date().getTime()}.pdf`, 'application/pdf');
+      if (!ok) throw new Error('Download failed');
+      
+      message.success('Đã tải xuống báo cáo PDF thành công!');
+    } catch (error) {
+      if (error?.response?.status === 429) {
+        message.warning('Vui lòng thực hiện chậm lại');
+      } else {
+        message.error('Có lỗi xảy ra khi tạo báo cáo');
+      }
+      console.error('Report generation error:', error);
+    } finally {
+      setGeneratingReport(false);
     }
   };
 
@@ -206,9 +274,36 @@ const HistoryPage = () => {
       await api.clearAllHistory();
       message.success('Đã xóa toàn bộ lịch sử thành công!');
       setHistory([]);
+      setSelectedRowKeys([]);
     } catch (error) {
       message.error('Không thể xóa lịch sử');
       console.error('Clear all error:', error);
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedRowKeys.length === 0) {
+      message.warning('Vui lòng chọn ít nhất một bản ghi để xóa');
+      return;
+    }
+
+    setDeletingMultiple(true);
+    try {
+      // Convert selected keys to indices in the original history array
+      const indicesToDelete = selectedRowKeys.map(key => {
+        const record = filteredHistory.find((_, idx) => `${filteredHistory[idx].createdAt}-${idx}` === key);
+        return history.findIndex(h => h.createdAt === record?.createdAt);
+      }).filter(idx => idx !== -1);
+
+      await api.deleteMultipleHistory(indicesToDelete);
+      message.success(`Đã xóa ${selectedRowKeys.length} bản ghi thành công!`);
+      setSelectedRowKeys([]);
+      await fetchHistory();
+    } catch (error) {
+      message.error('Không thể xóa các bản ghi đã chọn');
+      console.error('Delete multiple error:', error);
+    } finally {
+      setDeletingMultiple(false);
     }
   };
 
@@ -219,10 +314,8 @@ const HistoryPage = () => {
       width: 60,
       fixed: 'left',
       align: 'center',
-      render: (_, __, index) => {
-        // Calculate actual index based on pagination
-        return index + 1;
-      },
+      render: (_, __, index) => (pagination.pageSize * (pagination.current - 1)) + index + 1,
+      responsive: ['sm'],
     },
     {
       title: 'Thời gian',
@@ -230,6 +323,7 @@ const HistoryPage = () => {
       key: 'createdAt',
       width: 160,
       render: (date) => new Date(date).toLocaleString('vi-VN'),
+      responsive: ['md'],
     },
     {
       title: 'Tên bệnh nhân',
@@ -244,6 +338,7 @@ const HistoryPage = () => {
       key: 'citizenId',
       width: 150,
       render: (cccd) => cccd || <span style={{ color: '#999' }}>N/A</span>,
+      responsive: ['lg'],
     },
     {
       title: 'Tuổi',
@@ -251,6 +346,7 @@ const HistoryPage = () => {
       key: 'age',
       width: 70,
       align: 'center',
+      responsive: ['md'],
     },
     {
       title: 'Giới tính',
@@ -266,7 +362,8 @@ const HistoryPage = () => {
         };
         const info = genderMap[gender] || { text: gender, color: 'default' };
         return <Tag color={info.color}>{info.text}</Tag>;
-      }
+      },
+      responsive: ['lg'],
     },
     {
       title: 'Mức độ rủi ro',
@@ -274,14 +371,9 @@ const HistoryPage = () => {
       key: 'prediction',
       width: 140,
       align: 'center',
-      render: (prediction) => {
-        const colorMap = {
-          'Low Risk': 'green',
-          'Medium Risk': 'orange',
-          'High Risk': 'red'
-        };
-        return <Tag color={colorMap[prediction]}>{prediction}</Tag>;
-      },
+      render: (prediction) => (
+        <Tag color={getRiskColor(prediction)}>{getRiskLabelVi(prediction)}</Tag>
+      ),
     },
     {
       title: 'Điểm rủi ro',
@@ -292,25 +384,38 @@ const HistoryPage = () => {
       render: (risk) => {
         if (!risk) return 'N/A';
         const percentage = (risk * 100).toFixed(2);
-        const color = risk < 0.33 ? '#52c41a' : risk < 0.66 ? '#faad14' : '#ff4d4f';
-        return <span style={{ fontWeight: 'bold', color }}>{percentage}%</span>;
+        return <span style={{ fontWeight: 'bold', color: getRiskColorByScore(risk) }}>{percentage}%</span>;
       },
+      responsive: ['md'],
     },
     {
       title: 'Hành động',
       key: 'action',
-      width: 180,
-      fixed: 'right',
+      width: 150,
       align: 'center',
       render: (_, record, index) => (
-        <Space size="small">
+        <Space size="small" direction="horizontal">
           <Button
             type="primary"
             size="small"
             icon={<EyeOutlined />}
             onClick={() => handleViewDetail(record)}
+            className="action-btn"
+            title="Chi tiết"
           >
-            Chi tiết
+            <span className="btn-text">Chi tiết</span>
+          </Button>
+          <Button
+            type="default"
+            size="small"
+            icon={<FilePdfOutlined />}
+            onClick={() => handleGenerateReport(record)}
+            loading={generatingReport}
+            style={{ backgroundColor: '#52c41a', color: 'white', borderColor: '#52c41a' }}
+            className="action-btn"
+            title="Tải PDF"
+          >
+            <span className="btn-text">PDF</span>
           </Button>
           <Popconfirm
             title="Xóa bản ghi này?"
@@ -324,8 +429,10 @@ const HistoryPage = () => {
               danger
               size="small"
               icon={<DeleteOutlined />}
+              className="action-btn"
+              title="Xóa"
             >
-              Xóa
+              <span className="btn-text">Xóa</span>
             </Button>
           </Popconfirm>
         </Space>
@@ -333,35 +440,90 @@ const HistoryPage = () => {
     },
   ];
 
+  const rowSelection = {
+    selectedRowKeys,
+    onChange: (keys) => setSelectedRowKeys(keys),
+    selections: [
+      {
+        key: 'all',
+        text: 'Chọn tất cả',
+        onSelect: (changeableRowKeys) => {
+          setSelectedRowKeys(changeableRowKeys);
+        },
+      },
+      {
+        key: 'invert',
+        text: 'Đảo ngược lựa chọn',
+        onSelect: (changeableRowKeys) => {
+          const newKeys = changeableRowKeys.filter(key => !selectedRowKeys.includes(key));
+          const oldKeys = selectedRowKeys.filter(key => !changeableRowKeys.includes(key));
+          setSelectedRowKeys([...newKeys, ...oldKeys]);
+        },
+      },
+      {
+        key: 'none',
+        text: 'Bỏ chọn tất cả',
+        onSelect: () => {
+          setSelectedRowKeys([]);
+        },
+      },
+    ],
+  };
+
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ margin: '0 auto', padding: '0 16px' }}>
       <Card 
-        title="📋 Lịch sử chuẩn đoán" 
+        title="📋 Lịch sử chẩn đoán" 
         extra={
-          <Space>
-            <Tag color="blue" style={{ fontSize: 14, padding: '4px 12px' }}>
+          <Space wrap size="small" className='first-full-width'>
+            <Tag color="blue"  style={{ fontSize: 14, padding: '4px 12px' }}>
               Hiển thị: {filteredHistory.length} / {history.length} bản ghi
             </Tag>
+            {selectedRowKeys.length > 0 && (
+              <Tag color="orange" style={{ fontSize: 14, padding: '4px 12px' }}>
+                Đã chọn: {selectedRowKeys.length}
+              </Tag>
+            )}
+            {selectedRowKeys.length > 0 && (
+              <Popconfirm
+                title="Xóa các bản ghi đã chọn?"
+                description={`Bạn có chắc chắn muốn xóa ${selectedRowKeys.length} bản ghi đã chọn?`}
+                onConfirm={handleDeleteSelected}
+                okText="Xóa"
+                cancelText="Hủy"
+                okButtonProps={{ danger: true }}
+              >
+                <Button 
+                  danger 
+                  icon={<DeleteOutlined />}
+                  loading={deletingMultiple}
+                  size="small"
+                >
+                  <span className="btn-text">Xóa đã chọn</span>
+                </Button>
+              </Popconfirm>
+            )}
             {filteredHistory.length > 0 && (
               <Button 
                 type="primary" 
                 icon={<DownloadOutlined />}
                 onClick={handleExportCSV}
+                size="small"
               >
-                Xuất CSV
+                <span className="btn-text">Xuất CSV</span>
               </Button>
             )}
             {history.length > 0 && (
               <Popconfirm
                 title="Xóa toàn bộ lịch sử?"
-                description="Bạn có chắc chắn muốn xóa TẤT CẢ lịch sử chuẩn đoán? Hành động này không thể hoàn tác!"
+                description="Bạn có chắc chắn muốn xóa TẤT CẢ lịch sử chẩn đoán? Hành động này không thể hoàn tác!"
                 onConfirm={handleClearAll}
                 okText="Xóa tất cả"
                 cancelText="Hủy"
                 okButtonProps={{ danger: true }}
               >
-                <Button danger icon={<ClearOutlined />}>
-                  Xóa tất cả
+                <Button danger icon={<ClearOutlined />} size="small">
+                  <span className="btn-text">Xóa tất cả</span>
                 </Button>
               </Popconfirm>
             )}
@@ -377,7 +539,7 @@ const HistoryPage = () => {
                   <div style={{ fontSize: 28, fontWeight: 'bold', color: '#52c41a' }}>
                     {filteredHistory.filter(h => h.prediction === 'Low Risk').length}
                   </div>
-                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Low Risk</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Thấp</div>
                 </div>
               </Col>
               <Col xs={24} sm={8}>
@@ -385,7 +547,7 @@ const HistoryPage = () => {
                   <div style={{ fontSize: 28, fontWeight: 'bold', color: '#faad14' }}>
                     {filteredHistory.filter(h => h.prediction === 'Medium Risk').length}
                   </div>
-                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Medium Risk</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Trung bình</div>
                 </div>
               </Col>
               <Col xs={24} sm={8}>
@@ -393,7 +555,7 @@ const HistoryPage = () => {
                   <div style={{ fontSize: 28, fontWeight: 'bold', color: '#ff4d4f' }}>
                     {filteredHistory.filter(h => h.prediction === 'High Risk').length}
                   </div>
-                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>High Risk</div>
+                  <div style={{ fontSize: 13, color: '#666', marginTop: 4 }}>Cao</div>
                 </div>
               </Col>
             </Row>
@@ -445,9 +607,9 @@ const HistoryPage = () => {
                 style={{ width: '100%' }}
               >
                 <Option value="all">Tất cả</Option>
-                <Option value="Low Risk">Low Risk</Option>
-                <Option value="Medium Risk">Medium Risk</Option>
-                <Option value="High Risk">High Risk</Option>
+                <Option value="Low Risk">Thấp</Option>
+                <Option value="Medium Risk">Trung bình</Option>
+                <Option value="High Risk">Cao</Option>
               </Select>
             </Col>
 
@@ -492,6 +654,7 @@ const HistoryPage = () => {
         </Card>
 
         <Table
+          rowSelection={rowSelection}
           columns={columns}
           dataSource={filteredHistory}
           loading={loading}
@@ -499,25 +662,29 @@ const HistoryPage = () => {
           locale={{
             emptyText: searchText || filterRisk !== 'all' || filterGender !== 'all' || dateRange
               ? 'Không tìm thấy kết quả phù hợp với bộ lọc'
-              : 'Chưa có lịch sử chuẩn đoán',
+              : 'Chưa có lịch sử chẩn đoán',
           }}
           pagination={{
-            pageSize: 10,
+            current: pagination.current,
+            pageSize: pagination.pageSize,
+            total: filteredHistory.length,
             showSizeChanger: true,
             showTotal: (total, range) => `${range[0]}-${range[1]} của ${total} bản ghi`,
             pageSizeOptions: ['5', '10', '20', '50'],
+            onChange: (page, pageSize) => setPagination({ current: page, pageSize }),
+            onShowSizeChange: (_, size) => setPagination({ current: 1, pageSize: size }),
           }}
-          scroll={{ x: 1300 }}
+          scroll={{ x: 'max-content' }}
         />
       </Card>
 
       <Modal
-        title={<span style={{ fontSize: 18, fontWeight: 'bold' }}>📋 Chi tiết chuẩn đoán</span>}
+        title={<span style={{ fontSize: 18, fontWeight: 'bold' }}>📋 Chi tiết chẩn đoán</span>}
         open={modalVisible}
         onCancel={handleCloseModal}
         width="95%"
-        style={{ top: 20, maxWidth: 1600 }}
-        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto' }}
+        style={{ top: 20 }}
+        bodyStyle={{ maxHeight: 'calc(100vh - 200px)', overflowY: 'auto', padding: 'clamp(12px, 2vw, 24px)' }}
         footer={[
           <Button key="close" onClick={handleCloseModal} size="large">
             Đóng
@@ -529,7 +696,7 @@ const HistoryPage = () => {
             loading={predicting}
             onClick={handleRePredict}
           >
-            Chuẩn đoán lại
+            Chẩn đoán lại
           </Button>,
         ]}
       >
@@ -540,9 +707,11 @@ const HistoryPage = () => {
               size="small" 
               style={{ marginBottom: 16, backgroundColor: '#f0f5ff' }}
             >
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+              <div className="responsive-grid-3">
                 <div><strong>Thời gian:</strong> {new Date(selectedRecord.createdAt).toLocaleString('vi-VN')}</div>
-                <div><strong>Mức độ rủi ro:</strong> <Tag color={selectedRecord.prediction === 'High Risk' ? 'red' : selectedRecord.prediction === 'Medium Risk' ? 'orange' : 'green'}>{selectedRecord.prediction}</Tag></div>
+                <div>
+                  <strong>Mức độ rủi ro:</strong> <Tag color={getRiskColor(selectedRecord.prediction)}>{getRiskLabelVi(selectedRecord.prediction)}</Tag>
+                </div>
                 <div><strong>Điểm rủi ro:</strong> <strong style={{ fontSize: 16, color: '#1890ff' }}>{(selectedRecord.strokeRisk * 100).toFixed(2)}%</strong></div>
               </div>
             </Card>
@@ -551,7 +720,7 @@ const HistoryPage = () => {
             {selectedRecord.models && selectedRecord.models.length > 0 && (
               <Card title="📈 So sánh chi tiết các thuật toán (Lưu trữ)" size="small" style={{ marginBottom: 16 }}>
                 <Alert
-                  message="Kết quả đã lưu từ lần chuẩn đoán trước"
+                  message="Kết quả đã lưu từ lần chẩn đoán trước"
                   type="info"
                   showIcon
                   style={{ marginBottom: 16 }}
@@ -561,61 +730,32 @@ const HistoryPage = () => {
                   dataSource={selectedRecord.models}
                   rowKey="name"
                   pagination={false}
-                  scroll={{ x: 1600 }}
+                  scroll={{ x: 600 }}
                   expandable={{
-                    expandedRowRender: (record) => record.metrics?.confusion_matrix ? (
-                      <Card title="Confusion Matrix" size="small" style={{ maxWidth: 600, margin: '0 auto' }}>
-                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px', textAlign: 'center' }}>
-                          <div style={{ padding: '16px', backgroundColor: '#f6ffed', borderRadius: '8px' }}>
-                            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>{record.metrics.confusion_matrix.TN}</div>
-                            <div>True Negative (TN)</div>
-                          </div>
-                          <div style={{ padding: '16px', backgroundColor: '#fff2e8', borderRadius: '8px' }}>
-                            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>{record.metrics.confusion_matrix.FP}</div>
-                            <div>False Positive (FP)</div>
-                          </div>
-                          <div style={{ padding: '16px', backgroundColor: '#fff2e8', borderRadius: '8px' }}>
-                            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>{record.metrics.confusion_matrix.FN}</div>
-                            <div>False Negative (FN)</div>
-                          </div>
-                          <div style={{ padding: '16px', backgroundColor: '#f6ffed', borderRadius: '8px' }}>
-                            <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>{record.metrics.confusion_matrix.TP}</div>
-                            <div>True Positive (TP)</div>
-                          </div>
-                        </div>
-                      </Card>
-                    ) : null,
-                    rowExpandable: (record) => record.metrics?.confusion_matrix !== undefined,
+                    expandedRowRender: (record) => (
+                      <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                        <Alert
+                          message="Thông tin thuật toán"
+                          description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
+                          type="info"
+                          showIcon
+                        />
+                      </div>
+                    ),
                   }}
                   columns={[
-                    { title: 'Thuật toán', dataIndex: 'name', key: 'name', width: 180, fixed: 'left', 
+                    { title: 'Thuật toán', dataIndex: 'name', key: 'name', width: 200, fixed: 'left', 
                       render: (name) => <Tag color="blue" style={{ fontSize: 14 }}>{name}</Tag> },
-                    { title: 'Risk Score', key: 'riskScore', align: 'center', width: 120,
-                      render: (_, r) => <strong style={{ color: '#1890ff' }}>{(r.riskScore * 100).toFixed(2)}%</strong> },
-                    { title: 'Risk Level', key: 'riskLevel', align: 'center', width: 120,
+                    { title: 'Rủi ro', key: 'riskScore', align: 'center', width: 150,
+                      render: (_, r) => <strong style={{ color: getRiskColorByScore(r.riskScore), fontSize: '16px' }}>{(r.riskScore * 100).toFixed(2)}%</strong> },
+                    { title: 'Mức độ', key: 'riskLevel', align: 'center', width: 150,
                       render: (_, r) => (
-                        <Tag color={r.riskLevel === 'High Risk' ? 'red' : r.riskLevel === 'Medium Risk' ? 'orange' : 'green'}>
-                          {r.riskLevel}
-                        </Tag>
+                        <Tag color={getRiskColor(r.riskLevel)} style={{ fontSize: '14px', padding: '4px 12px' }}>{getRiskLabelVi(r.riskLevel)}</Tag>
                       )},
-                    { title: 'Accuracy', key: 'accuracy', align: 'center', width: 100,
-                      render: (_, r) => r.metrics?.accuracy ? `${(r.metrics.accuracy * 100).toFixed(2)}%` : 'N/A' },
-                    { title: 'Precision', key: 'precision', align: 'center', width: 100,
-                      render: (_, r) => r.metrics?.precision ? `${(r.metrics.precision * 100).toFixed(2)}%` : 'N/A' },
-                    { title: 'Recall', key: 'recall', align: 'center', width: 100,
-                      render: (_, r) => r.metrics?.recall ? `${(r.metrics.recall * 100).toFixed(2)}%` : 'N/A' },
-                    { title: 'F1-Score', key: 'f1', align: 'center', width: 100,
-                      render: (_, r) => r.metrics?.f1 ? `${(r.metrics.f1 * 100).toFixed(2)}%` : 'N/A' },
-                    { title: 'ROC-AUC', key: 'auc', align: 'center', width: 100,
-                      render: (_, r) => r.metrics?.auc ? `${(r.metrics.auc * 100).toFixed(2)}%` : 'N/A' },
-                    { title: 'MAE', key: 'mae', align: 'center', width: 90,
-                      render: (_, r) => r.metrics?.mae ? r.metrics.mae.toFixed(4) : 'N/A' },
-                    { title: 'MSE', key: 'mse', align: 'center', width: 90,
-                      render: (_, r) => r.metrics?.mse ? r.metrics.mse.toFixed(4) : 'N/A' },
                   ]}
                 />
                 <p style={{ marginTop: 12, fontSize: '12px', color: '#999' }}>
-                  💡 Nhấp vào mỗi hàng để xem Confusion Matrix chi tiết
+                  💡 Nhấp vào mỗi hàng để xem thông tin chi tiết
                 </p>
               </Card>
             )}
@@ -627,7 +767,7 @@ const HistoryPage = () => {
                 size="small"
                 style={{ marginBottom: 16, backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}
               >
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                <div className="responsive-grid-2">
                   {selectedRecord.recommendations.map((rec, index) => (
                     <div 
                       key={index} 
@@ -651,9 +791,20 @@ const HistoryPage = () => {
 
             <Card title="Chỉnh sửa thông số bệnh nhân" size="small" style={{ marginBottom: 16 }}>
               <Form form={form} layout="vertical">
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                  <Form.Item label="Tên bệnh nhân" name="patientName" rules={[{ required: true, message: 'Vui lòng nhập tên bệnh nhân!' }]}>
-                    <Input placeholder="Ví dụ: Nguyễn Văn A" />
+                {/* Thông tin cá nhân */}
+                <Divider orientation="left" style={{ fontSize: '14px', fontWeight: 'bold', color: '#1890ff' }}>
+                  📋 Thông tin cá nhân
+                </Divider>
+                <div className="responsive-grid-3">
+                  <Form.Item 
+                    label="Tên bệnh nhân" 
+                    name="patientName" 
+                    rules={[
+                      { required: true, message: 'Vui lòng nhập tên bệnh nhân!' },
+                      { max: 50, message: 'Tên tối đa 50 ký tự' }
+                    ]}
+                  > 
+                    <Input placeholder="Ví dụ: Nguyễn Văn A" allowClear maxLength={50} showCount />
                   </Form.Item>
 
                   <Form.Item 
@@ -702,16 +853,13 @@ const HistoryPage = () => {
                       <Option value="Rural">Nông thôn</Option>
                     </Select>
                   </Form.Item>
+                </div>
 
-                  <Form.Item label="Tình trạng hút thuốc" name="smokingStatus" rules={[{ required: true }]}>
-                    <Select placeholder="Chọn">
-                      <Option value="never smoked">Không bao giờ hút</Option>
-                      <Option value="formerly smoked">Đã từng hút</Option>
-                      <Option value="smokes">Đang hút</Option>
-                      <Option value="Unknown">Không rõ</Option>
-                    </Select>
-                  </Form.Item>
-
+                {/* Hồ sơ y tế */}
+                <Divider orientation="left" style={{ fontSize: '14px', fontWeight: 'bold', color: '#52c41a', marginTop: '24px' }}>
+                  🏥 Hồ sơ y tế
+                </Divider>
+                <div className="responsive-grid-3">
                   <Form.Item label="Tăng huyết áp" name="hypertension">
                     <Select placeholder="Chọn">
                       <Option value={false}>Không</Option>
@@ -726,12 +874,27 @@ const HistoryPage = () => {
                     </Select>
                   </Form.Item>
 
-                  <Form.Item label="Chỉ số glucose trung bình (mg/dL)" name="avgGlucoseLevel" rules={[{ required: true }]}>
-                    <InputNumber min={0} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 105.2" />
+                  <Form.Item label="Tình trạng hút thuốc" name="smokingStatus" rules={[{ required: true }]}>
+                    <Select placeholder="Chọn">
+                      <Option value="never smoked">Không bao giờ hút</Option>
+                      <Option value="formerly smoked">Đã từng hút</Option>
+                      <Option value="smokes">Đang hút</Option>
+                      <Option value="Unknown">Không rõ</Option>
+                    </Select>
+                  </Form.Item>
+                </div>
+
+                {/* Chỉ số sức khỏe */}
+                <Divider orientation="left" style={{ fontSize: '14px', fontWeight: 'bold', color: '#fa8c16', marginTop: '24px' }}>
+                  📊 Chỉ số sức khỏe
+                </Divider>
+                <div className="responsive-grid-3">
+                  <Form.Item label="Chỉ số glucose trung bình (mg/dL)" name="avgGlucoseLevel" rules={[{ required: true }]}> 
+                    <InputNumber min={0} max={400} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 105.2" />
                   </Form.Item>
 
-                  <Form.Item label="Chỉ số BMI" name="bmi" rules={[{ required: true }]}>
-                    <InputNumber min={0} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 24.6" />
+                  <Form.Item label="Chỉ số BMI" name="bmi" rules={[{ required: true }]}> 
+                    <InputNumber min={0} max={60} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 24.6" />
                   </Form.Item>
                 </div>
               </Form>
@@ -747,31 +910,38 @@ const HistoryPage = () => {
             {newResult && !predicting && (
               <>
                 <Card 
-                  title="📊 Kết quả chuẩn đoán mới" 
+                  title="📊 Kết quả chẩn đoán mới" 
                   size="small" 
                   style={{ marginBottom: 16, backgroundColor: '#f6ffed', borderColor: '#b7eb8f' }}
                 >
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                  <div className="responsive-grid-2">
                     <div>
-                      <strong>Mức độ rủi ro (trung bình):</strong> 
+                      <strong>Mức độ rủi ro:</strong> 
                       <Tag color={newResult.riskLevel === 'High Risk' ? 'red' : newResult.riskLevel === 'Medium Risk' ? 'orange' : 'green'} style={{ marginLeft: 8, fontSize: 14 }}>
                         {newResult.riskLevel}
                       </Tag>
                     </div>
                     <div>
-                      <strong>Điểm rủi ro (trung bình):</strong> 
+                      <strong>Điểm rủi ro:</strong> 
                       <strong style={{ fontSize: 18, marginLeft: 8, color: '#52c41a' }}>
                         {(newResult.riskScore * 100).toFixed(2)}%
                       </strong>
                     </div>
                   </div>
+                  <Alert
+                    message="Chẩn đoán từ thuật toán đáng tin cậy nhất"
+                    description="Kết quả dựa trên Logistic Regression với class_weight='balanced'"
+                    type="success"
+                    showIcon
+                    style={{ marginTop: 12, fontSize: 12 }}
+                  />
                 </Card>
 
                 {Array.isArray(newResult.models) && newResult.models.length > 0 && (
                   <Card title="📈 So sánh chi tiết từng thuật toán Machine Learning" size="small" style={{ marginBottom: 16 }}>
                     <Alert
-                      message={`Kết quả từ ${newResult.models.length} thuật toán`}
-                      description="Metrics được tính toán từ test set để đánh giá độ chính xác của từng thuật toán"
+                      message={`So sánh ${newResult.models.length} thuật toán khác nhau`}
+                      description="Các thuật toán có chiến lược dự đoán khác nhau. Dữ liệu này để tham khảo và so sánh giữa các model."
                       type="info"
                       showIcon
                       style={{ marginBottom: 16 }}
@@ -779,44 +949,17 @@ const HistoryPage = () => {
                     <Table
                       pagination={false}
                       size="small"
-                      scroll={{ x: 1300 }}
+                      scroll={{ x: 600 }}
                       dataSource={newResult.models.map((m, idx) => ({ key: idx, ...m }))}
                       expandable={{
                         expandedRowRender: (record) => (
                           <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                            <h4 style={{ marginBottom: 12 }}>🔍 Confusion Matrix</h4>
-                            {record.metrics?.confusion_matrix ? (
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '12px' }}>
-                                <Card size="small" style={{ backgroundColor: '#f6ffed', borderColor: '#b7eb8f', textAlign: 'center' }}>
-                                  <div style={{ fontSize: 11, color: '#666' }}>True Negative</div>
-                                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#52c41a' }}>
-                                    {record.metrics.confusion_matrix.true_negative}
-                                  </div>
-                                  <div style={{ fontSize: 11 }}>Dự đoán đúng: Không</div>
-                                </Card>
-                                <Card size="small" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', textAlign: 'center' }}>
-                                  <div style={{ fontSize: 11, color: '#666' }}>False Positive</div>
-                                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>
-                                    {record.metrics.confusion_matrix.false_positive}
-                                  </div>
-                                  <div style={{ fontSize: 11 }}>Dự đoán sai: Không → Có</div>
-                                </Card>
-                                <Card size="small" style={{ backgroundColor: '#fff7e6', borderColor: '#ffd591', textAlign: 'center' }}>
-                                  <div style={{ fontSize: 11, color: '#666' }}>False Negative</div>
-                                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#fa8c16' }}>
-                                    {record.metrics.confusion_matrix.false_negative}
-                                  </div>
-                                  <div style={{ fontSize: 11 }}>Dự đoán sai: Có → Không</div>
-                                </Card>
-                                <Card size="small" style={{ backgroundColor: '#fff1f0', borderColor: '#ffa39e', textAlign: 'center' }}>
-                                  <div style={{ fontSize: 11, color: '#666' }}>True Positive</div>
-                                  <div style={{ fontSize: 24, fontWeight: 'bold', color: '#f5222d' }}>
-                                    {record.metrics.confusion_matrix.true_positive}
-                                  </div>
-                                  <div style={{ fontSize: 11 }}>Dự đoán đúng: Có</div>
-                                </Card>
-                              </div>
-                            ) : <span style={{ color: '#999' }}>Không có dữ liệu</span>}
+                            <Alert
+                              message="Thông tin thuật toán"
+                              description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
+                              type="info"
+                              showIcon
+                            />
                           </div>
                         ),
                       }}
@@ -825,7 +968,7 @@ const HistoryPage = () => {
                           title: 'Thuật toán', 
                           dataIndex: 'name', 
                           key: 'name',
-                          width: 150,
+                          width: 200,
                           fixed: 'left',
                           render: (name) => {
                             const nameMap = {
@@ -841,9 +984,9 @@ const HistoryPage = () => {
                           title: 'Rủi ro', 
                           key: 'riskScore',
                           align: 'center',
-                          width: 90,
+                          width: 150,
                           render: (_, r) => (
-                            <span style={{ fontWeight: 'bold', color: r.riskScore > 0.66 ? '#f5222d' : r.riskScore > 0.33 ? '#fa8c16' : '#52c41a' }}>
+                            <span style={{ fontWeight: 'bold', fontSize: '16px', color: getRiskColorByScore(r.riskScore) }}>
                               {(r.riskScore * 100).toFixed(1)}%
                             </span>
                           )
@@ -853,66 +996,15 @@ const HistoryPage = () => {
                           dataIndex: 'riskLevel',
                           key: 'riskLevel',
                           align: 'center',
-                          width: 80,
-                          render: (lvl) => {
-                            const colorMap = { 'High Risk': 'red', 'Medium Risk': 'orange', 'Low Risk': 'green' };
-                            const labelMap = { 'High Risk': 'Cao', 'Medium Risk': 'TB', 'Low Risk': 'Thấp' };
-                            return <Tag color={colorMap[lvl] || 'default'} style={{ margin: 0 }}>{labelMap[lvl] || lvl}</Tag>;
-                          },
-                        },
-                        { 
-                          title: 'Accuracy', 
-                          key: 'accuracy',
-                          align: 'center',
-                          width: 90,
-                          render: (_, r) => r.metrics?.accuracy ? `${(r.metrics.accuracy * 100).toFixed(1)}%` : 'N/A'
-                        },
-                        { 
-                          title: 'Precision', 
-                          key: 'precision',
-                          align: 'center',
-                          width: 90,
-                          render: (_, r) => r.metrics?.precision ? `${(r.metrics.precision * 100).toFixed(1)}%` : 'N/A'
-                        },
-                        { 
-                          title: 'Recall', 
-                          key: 'recall',
-                          align: 'center',
-                          width: 90,
-                          render: (_, r) => r.metrics?.recall ? `${(r.metrics.recall * 100).toFixed(1)}%` : 'N/A'
-                        },
-                        { 
-                          title: 'F1', 
-                          key: 'f1',
-                          align: 'center',
-                          width: 80,
-                          render: (_, r) => r.metrics?.f1_score ? `${(r.metrics.f1_score * 100).toFixed(1)}%` : 'N/A'
-                        },
-                        { 
-                          title: 'AUC', 
-                          key: 'auc',
-                          align: 'center',
-                          width: 80,
-                          render: (_, r) => r.metrics?.roc_auc ? `${(r.metrics.roc_auc * 100).toFixed(1)}%` : 'N/A'
-                        },
-                        { 
-                          title: 'MAE', 
-                          key: 'mae',
-                          align: 'center',
-                          width: 80,
-                          render: (_, r) => r.metrics?.mae ? r.metrics.mae.toFixed(3) : 'N/A'
-                        },
-                        { 
-                          title: 'MSE', 
-                          key: 'mse',
-                          align: 'center',
-                          width: 80,
-                          render: (_, r) => r.metrics?.mse ? r.metrics.mse.toFixed(3) : 'N/A'
+                          width: 150,
+                          render: (lvl) => (
+                            <Tag color={getRiskColor(lvl)} style={{ fontSize: '14px', padding: '4px 12px' }}>{getRiskLabelVi(lvl)}</Tag>
+                          ),
                         },
                       ]}
                     />
                     <p style={{ marginTop: 12, fontSize: '12px', color: '#999', marginBottom: 0 }}>
-                      💡 Nhấn vào mỗi hàng để xem Confusion Matrix chi tiết
+                      💡 Nhấn vào mỗi hàng để xem thông tin chi tiết
                     </p>
                   </Card>
                 )}
@@ -923,7 +1015,7 @@ const HistoryPage = () => {
                     size="small"
                     style={{ backgroundColor: '#fffbe6', borderColor: '#ffe58f' }}
                   >
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '16px' }}>
+                    <div className="responsive-grid-2">
                       {newResult.recommendations.map((rec, index) => (
                         <div 
                           key={index} 

@@ -47,6 +47,10 @@ const api = {
     return apiClient.delete(`/predictions/history/${index}`);
   },
 
+  deleteMultipleHistory: (indices) => {
+    return apiClient.post('/predictions/history/delete-multiple', { indices });
+  },
+
   clearAllHistory: () => {
     return apiClient.delete('/predictions/history');
   },
@@ -88,6 +92,30 @@ const api = {
 
   getDatasetInfo: () => {
     return apiClient.get('/validation/dataset/info');
+  },
+
+  // Report endpoints
+  generateReport: async (patientData, predictionResult) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/${API_VERSION}/report/generate`,
+        {
+          patientData,
+          predictionResult
+        },
+        {
+          responseType: 'blob',
+          timeout: 30000,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Report generation error:', error);
+      throw error;
+    }
   },
 
   // Health check

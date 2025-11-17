@@ -89,12 +89,12 @@ const AlgorithmsPage = () => {
   ];
 
   return (
-    <div style={{ maxWidth: 1800, margin: '0 auto', padding: '0 24px' }}>
+    <div style={{ margin: '0 auto', padding: '0 clamp(12px, 2vw, 24px)' }}>
       <Card 
         title={
           <span style={{ fontSize: 20 }}>
             <ExperimentOutlined style={{ marginRight: 8 }} />
-            🧪 Các thuật toán Machine Learning được sử dụng
+            Các thuật toán Machine Learning được sử dụng
           </span>
         }
       >
@@ -114,9 +114,11 @@ const AlgorithmsPage = () => {
           {algorithms.map((algo) => (
             <Panel
               header={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  {algo.icon}
-                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>{algo.name}</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {algo.icon}
+                    <span style={{ fontSize: 16, fontWeight: 'bold' }}>{algo.name}</span>
+                  </div>
                   <Tag color={algo.color}>{algo.key}</Tag>
                 </div>
               }
