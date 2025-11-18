@@ -6,6 +6,7 @@ import {
   ExperimentOutlined,
   HistoryOutlined,
   CalculatorOutlined,
+  SwapOutlined,
   BulbOutlined,
   SettingOutlined,
   LineChartOutlined,
@@ -46,6 +47,11 @@ const Layout = ({ children }) => {
       key: '/bmi-calculator',
       icon: <CalculatorOutlined />,
       label: <Link to="/bmi-calculator">Tính BMI</Link>,
+    },
+    {
+      key: '/unit-converter',
+      icon: <SwapOutlined />,
+      label: <Link to="/unit-converter">Quy đổi đơn vị</Link>,
     },
     {
       key: '/algorithms',

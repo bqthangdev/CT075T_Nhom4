@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Card, Table, message, Button, Modal, Form, InputNumber, Select, Tag, Spin, Popconfirm, Space, Divider, Alert, Input, DatePicker, Row, Col } from 'antd';
+import { Card, Table, message, Button, Modal, Form, InputNumber, Select, Tag, Spin, Popconfirm, Space, Divider, Alert, Input, DatePicker, Row, Col, Tooltip } from 'antd';
 import { getRiskLabelVi, getRiskColor, getRiskColorByScore } from '../utils/riskUtils';
-import { EyeOutlined, DeleteOutlined, ClearOutlined, SearchOutlined, FilterOutlined, DownloadOutlined, FilePdfOutlined } from '@ant-design/icons';
+import { EyeOutlined, DeleteOutlined, ClearOutlined, SearchOutlined, FilterOutlined, DownloadOutlined, FilePdfOutlined, SwapOutlined, QuestionCircleOutlined } from '@ant-design/icons';
 import api from '../services/api';
-import { downloadBlob } from '../utils/helpers';
+import { downloadBlob, convertGlucose, GLUCOSE_UNITS, normalizeGlucoseMgDl } from '../utils/helpers';
 
 const { Option } = Select;
 const { RangePicker } = DatePicker;
@@ -21,6 +21,9 @@ const HistoryPage = () => {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 10 });
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [deletingMultiple, setDeletingMultiple] = useState(false);
+
+  // Glucose unit state for modal form
+  const [modalGlucoseUnit, setModalGlucoseUnit] = useState(GLUCOSE_UNITS.MG_DL);
 
   // Filter states
   const [searchText, setSearchText] = useState('');
@@ -157,6 +160,9 @@ const HistoryPage = () => {
   const handleViewDetail = (record) => {
     setSelectedRecord(record);
     setNewResult(null);
+    setModalGlucoseUnit(GLUCOSE_UNITS.MG_DL); // Start with mg/dL (data is stored in mg/dL)
+    
+    // Set form values - glucose is already in mg/dL from backend
     form.setFieldsValue({
       patientName: record.patientName,
       citizenId: record.citizenId,
@@ -168,9 +174,10 @@ const HistoryPage = () => {
       smokingStatus: record.smokingStatus,
       hypertension: record.hypertension,
       heartDisease: record.heartDisease,
-      avgGlucoseLevel: record.avgGlucoseLevel,
+      avgGlucoseLevel: record.avgGlucoseLevel, // This is in mg/dL
       bmi: record.bmi,
     });
+    
     setModalVisible(true);
   };
 
@@ -179,6 +186,7 @@ const HistoryPage = () => {
     setSelectedRecord(null);
     setNewResult(null);
     form.resetFields();
+    setModalGlucoseUnit(GLUCOSE_UNITS.MG_DL); // Reset unit
   };
 
   const handleRePredict = async () => {
@@ -186,7 +194,13 @@ const HistoryPage = () => {
       const values = await form.validateFields();
       setPredicting(true);
       
-      const response = await api.predictStrokeRisk(values);
+      // Normalize glucose to mg/dL before sending
+      const payload = {
+        ...values,
+        avgGlucoseLevel: normalizeGlucoseMgDl(values.avgGlucoseLevel, modalGlucoseUnit),
+      };
+      
+      const response = await api.predictStrokeRisk(payload);
       setNewResult(response.data);
       
       // Reload history to update the table with new record
@@ -789,6 +803,8 @@ const HistoryPage = () => {
               </Card>
             )}
 
+            {/* Quick Converter Tool - REMOVED, now integrated in form field */}
+
             <Card title="Chỉnh sửa thông số bệnh nhân" size="small" style={{ marginBottom: 16 }}>
               <Form form={form} layout="vertical">
                 {/* Thông tin cá nhân */}
@@ -819,7 +835,7 @@ const HistoryPage = () => {
                   </Form.Item>
 
                   <Form.Item label="Tuổi" name="age" rules={[{ required: true, message: 'Vui lòng nhập tuổi!' }]}>
-                    <InputNumber min={0} max={120} style={{ width: '100%' }} placeholder="Ví dụ: 45" />
+                    <InputNumber min={1} max={120} style={{ width: '100%' }} placeholder="Ví dụ: 45" />
                   </Form.Item>
 
                   <Form.Item label="Giới tính" name="gender" rules={[{ required: true }]}>
@@ -889,12 +905,63 @@ const HistoryPage = () => {
                   📊 Chỉ số sức khỏe
                 </Divider>
                 <div className="responsive-grid-3">
-                  <Form.Item label="Chỉ số glucose trung bình (mg/dL)" name="avgGlucoseLevel" rules={[{ required: true }]}> 
-                    <InputNumber min={0} max={400} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 105.2" />
-                  </Form.Item>
+                  <div>
+                    <label style={{ display: 'block', marginBottom: 8 }}>
+                      <span style={{ color: '#ff4d4f', marginRight: 4 }}>*</span>
+                      Chỉ số glucose trung bình{' '}
+                      <Tooltip title="Có thể nhập theo mg/dL, mmol/L, g/L hoặc mg/L. Hệ thống sẽ tự quy đổi về mg/dL khi chẩn đoán.">
+                        <QuestionCircleOutlined style={{ color: '#1890ff' }} />
+                      </Tooltip>
+                    </label>
+                    <Space.Compact style={{ width: '100%' }}>
+                      <Form.Item 
+                        name="avgGlucoseLevel" 
+                        rules={[
+                          { required: true, message: 'Vui lòng nhập chỉ số glucose!' },
+                          {
+                            validator: (_, value) => {
+                              if (value === undefined || value === null) return Promise.resolve();
+                              // Validate based on normalized mg/dL
+                              const mgdl = normalizeGlucoseMgDl(value, modalGlucoseUnit);
+                              return mgdl >= 40 && mgdl <= 400
+                                ? Promise.resolve()
+                                : Promise.reject(new Error('Giá trị tương đương phải từ 40 đến 400 mg/dL'));
+                            }
+                          }
+                        ]}
+                        style={{ marginBottom: 0, flex: 1 }}
+                        noStyle
+                      > 
+                        <InputNumber 
+                          min={0}
+                          step={0.1} 
+                          style={{ width: '100%' }} 
+                          placeholder={modalGlucoseUnit === GLUCOSE_UNITS.MMOL_L ? 'Ví dụ: 5.6' : 'Ví dụ: 105.2'}
+                        />
+                      </Form.Item>
+                      <Select 
+                        value={modalGlucoseUnit} 
+                        onChange={(unit) => {
+                          const prevUnit = modalGlucoseUnit;
+                          setModalGlucoseUnit(unit);
+                          const current = form.getFieldValue('avgGlucoseLevel');
+                          if (current !== undefined && current !== null && current !== '') {
+                            const converted = convertGlucose(current, prevUnit, unit, 1);
+                            form.setFieldsValue({ avgGlucoseLevel: converted });
+                          }
+                        }}
+                        style={{ width: 120 }}
+                      >
+                        <Option value={GLUCOSE_UNITS.MG_DL}>mg/dL</Option>
+                        <Option value={GLUCOSE_UNITS.MMOL_L}>mmol/L</Option>
+                        <Option value={GLUCOSE_UNITS.G_L}>g/L</Option>
+                        <Option value={GLUCOSE_UNITS.MG_L}>mg/L</Option>
+                      </Select>
+                    </Space.Compact>
+                  </div>
 
                   <Form.Item label="Chỉ số BMI" name="bmi" rules={[{ required: true }]}> 
-                    <InputNumber min={0} max={60} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 24.6" />
+                    <InputNumber min={10} max={60} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 24.6" />
                   </Form.Item>
                 </div>
               </Form>

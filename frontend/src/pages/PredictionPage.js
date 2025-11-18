@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Card, Form, Input, Select, Button, InputNumber, message, Spin, Table, Tag, Tooltip, Alert, Divider } from 'antd';
+import { Card, Form, Input, Select, Button, InputNumber, message, Spin, Table, Tag, Tooltip, Alert, Divider, Space } from 'antd';
 import { getRiskLabelVi, getRiskColor, getRiskColorByScore } from '../utils/riskUtils';
 import { QuestionCircleOutlined, FilePdfOutlined, DownloadOutlined } from '@ant-design/icons';
 import api from '../services/api';
-import { downloadBlob, sanitizeFullName, isValidFullName, onlyDigits, isAllSameDigits } from '../utils/helpers';
+import { downloadBlob, sanitizeFullName, isValidFullName, onlyDigits, isAllSameDigits, convertGlucose, normalizeGlucoseMgDl, GLUCOSE_UNITS } from '../utils/helpers';
 
 const { Option } = Select;
 
@@ -17,6 +17,7 @@ const PredictionPage = () => {
   const [lastRequestTime, setLastRequestTime] = useState(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [glucoseUnit, setGlucoseUnit] = useState(GLUCOSE_UNITS.MG_DL);
 
   const onFinish = async (values) => {
     // Check if blocked
@@ -69,11 +70,18 @@ const PredictionPage = () => {
       return;
     }
 
+    // Normalize glucose to mg/dL before sending
+    const payload = {
+      ...values,
+      avgGlucoseLevel: normalizeGlucoseMgDl(values.avgGlucoseLevel, glucoseUnit),
+    };
+
     setLoading(true);
     try {
-      const response = await api.predictStrokeRisk(values);
+      const response = await api.predictStrokeRisk(payload);
       setResult(response.data);
-      setPatientFormData(values); // Save form data for report generation
+      // Save normalized data for report generation (backend/report expects mg/dL)
+      setPatientFormData(payload);
       message.success('Chẩn đoán thành công!');
     } catch (error) {
       if (error?.response?.status === 429) {
@@ -389,7 +397,7 @@ const PredictionPage = () => {
               label={
                 <span>
                   Chỉ số glucose trung bình{' '}
-                  <Tooltip title="Nồng độ glucose trung bình trong máu (mg/dL). Bình thường: 70-100, Tiền tiểu đường: 100-125, Tiểu đường: >126">
+                  <Tooltip title="Có thể nhập theo mg/dL, mmol/L, g/L hoặc mg/L. Hệ thống sẽ tự quy đổi về mg/dL khi chẩn đoán.">
                     <QuestionCircleOutlined style={{ color: '#1890ff' }} />
                   </Tooltip>
                 </span>
@@ -400,14 +408,41 @@ const PredictionPage = () => {
                 {
                   validator: (_, value) => {
                     if (value === undefined || value === null) return Promise.resolve();
-                    return value >= 40 && value <= 400
+                    // Validate based on normalized mg/dL
+                    const mgdl = normalizeGlucoseMgDl(value, glucoseUnit);
+                    return mgdl >= 40 && mgdl <= 400
                       ? Promise.resolve()
-                      : Promise.reject(new Error('Glucose hợp lệ từ 40 đến 400 mg/dL'));
+                      : Promise.reject(new Error('Giá trị tương đương phải từ 40 đến 400 mg/dL'));
                   }
                 }
               ]}
             >
-              <InputNumber min={40} max={400} step={0.1} style={{ width: '100%' }} placeholder="Ví dụ: 105.2" />
+              <Space.Compact style={{ width: '100%' }}>
+                <InputNumber 
+                  min={0}
+                  step={0.1} 
+                  style={{ width: '100%' }} 
+                  placeholder={glucoseUnit === GLUCOSE_UNITS.MMOL_L ? 'Ví dụ: 5.6' : 'Ví dụ: 105.2'}
+                />
+                <Select 
+                  value={glucoseUnit} 
+                  onChange={(unit) => {
+                    const prevUnit = glucoseUnit;
+                    setGlucoseUnit(unit);
+                    const current = form.getFieldValue('avgGlucoseLevel');
+                    if (current !== undefined && current !== null && current !== '') {
+                      const converted = convertGlucose(current, prevUnit, unit, 1);
+                      form.setFieldsValue({ avgGlucoseLevel: converted });
+                    }
+                  }}
+                  style={{ width: 120 }}
+                >
+                  <Option value={GLUCOSE_UNITS.MG_DL}>mg/dL</Option>
+                  <Option value={GLUCOSE_UNITS.MMOL_L}>mmol/L</Option>
+                  <Option value={GLUCOSE_UNITS.G_L}>g/L</Option>
+                  <Option value={GLUCOSE_UNITS.MG_L}>mg/L</Option>
+                </Select>
+              </Space.Compact>
             </Form.Item>
 
             <Form.Item

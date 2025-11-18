@@ -6,6 +6,7 @@ import PredictionPage from './pages/PredictionPage';
 import HistoryPage from './pages/HistoryPage';
 import AboutPage from './pages/AboutPage';
 import BMICalculatorPage from './pages/BMICalculatorPage';
+import UnitConverterPage from './pages/UnitConverterPage';
 import AlgorithmsPage from './pages/AlgorithmsPage';
 import ModelConfigPage from './pages/ModelConfigPage';
 import ValidationPage from './pages/ValidationPage';
@@ -37,6 +38,7 @@ function App() {
             <Route path="/prediction" element={<PredictionPage />} />
             <Route path="/history" element={<HistoryPage />} />
             <Route path="/bmi-calculator" element={<BMICalculatorPage />} />
+            <Route path="/unit-converter" element={<UnitConverterPage />} />
             <Route path="/algorithms" element={<AlgorithmsPage />} />
             <Route path="/model-config" element={<ModelConfigPage />} />
             <Route path="/validation" element={<ValidationPage />} />

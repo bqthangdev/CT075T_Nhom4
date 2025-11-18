@@ -110,3 +110,36 @@ export const downloadBlob = (data, filename, mime = 'application/octet-stream') 
     return false;
   }
 };
+
+// === Glucose unit conversions ===
+// Supported units: mg/dL (default), mmol/L, mg/L, g/L
+export const GLUCOSE_UNITS = {
+  MG_DL: 'mg/dL',
+  MMOL_L: 'mmol/L',
+  MG_L: 'mg/L',
+  G_L: 'g/L',
+};
+
+// Conversion factors to mg/dL for glucose
+// mmol/L uses factor 18 for glucose (approx. 18.0)
+const FACTOR_TO_MGDL = {
+  'mg/dL': 1,
+  'mmol/L': 18,
+  'mg/L': 0.1,
+  'g/L': 100,
+};
+
+export const convertGlucose = (value, fromUnit, toUnit, precision = 1) => {
+  if (value === undefined || value === null || value === '') return value;
+  if (Number.isNaN(Number(value))) return value;
+  const from = FACTOR_TO_MGDL[fromUnit] ?? 1;
+  const to = FACTOR_TO_MGDL[toUnit] ?? 1;
+  const mgdl = Number(value) * from;
+  const result = mgdl / to;
+  const factor = Math.pow(10, precision);
+  return Math.round(result * factor) / factor;
+};
+
+export const normalizeGlucoseMgDl = (value, unit) => {
+  return convertGlucose(value, unit, GLUCOSE_UNITS.MG_DL, 1);
+};
