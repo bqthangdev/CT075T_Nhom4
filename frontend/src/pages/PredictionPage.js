@@ -555,7 +555,9 @@ const PredictionPage = () => {
                 pagination={false}
                 scroll={{ x: 600 }}
                 size="small"
-                dataSource={result.models.map((m, idx) => ({ key: idx, ...m }))}
+                dataSource={result.models
+                  .filter(m => m.name !== 'gradient_boosting')  // TEMPORARILY DISABLED: Gradient Boosting
+                  .map((m, idx) => ({ key: idx, ...m }))}
                 expandable={{
                   expandedRowRender: (record) => (
                     <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>

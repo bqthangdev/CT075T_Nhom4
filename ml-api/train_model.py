@@ -82,9 +82,10 @@ def get_algorithms():
     rf_params = config.get('random_forest', {
         'n_estimators': 300, 'random_state': 42, 'class_weight': 'balanced'
     })
-    gb_params = config.get('gradient_boosting', {
-        'n_estimators': 100, 'learning_rate': 0.1, 'max_depth': 3, 'random_state': 42
-    })
+    # TEMPORARILY DISABLED: Gradient Boosting
+    # gb_params = config.get('gradient_boosting', {
+    #     'n_estimators': 100, 'learning_rate': 0.1, 'max_depth': 3, 'random_state': 42
+    # })
     knn_params = config.get('knn', {
         'n_neighbors': 15, 'weights': 'uniform', 'algorithm': 'auto'
     })
@@ -92,13 +93,13 @@ def get_algorithms():
     # Remove None values for params
     lr_params = {k: v for k, v in lr_params.items() if v is not None}
     rf_params = {k: v for k, v in rf_params.items() if v is not None}
-    gb_params = {k: v for k, v in gb_params.items() if v is not None}
+    # gb_params = {k: v for k, v in gb_params.items() if v is not None}  # DISABLED
     knn_params = {k: v for k, v in knn_params.items() if v is not None}
     
     return {
         'logistic_regression': LogisticRegression(**lr_params),
         'random_forest': RandomForestClassifier(**rf_params),
-        'gradient_boosting': GradientBoostingClassifier(**gb_params),
+        # 'gradient_boosting': GradientBoostingClassifier(**gb_params),  # TEMPORARILY DISABLED
         'knn': KNeighborsClassifier(**knn_params),
     }
 

@@ -45,27 +45,28 @@ const AlgorithmsPage = () => {
       useCase: 'Rất hiệu quả cho bài toán phức tạp với nhiều đặc trưng và dữ liệu không cân bằng',
       color: '#52c41a'
     },
-    {
-      key: 'gradient_boosting',
-      name: 'Gradient Boosting',
-      icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#faad14' }} />,
-      description: 'Thuật toán tăng cường gradient - xây dựng mô hình mạnh bằng cách kết hợp nhiều mô hình yếu',
-      advantages: [
-        'Độ chính xác rất cao',
-        'Xử lý tốt các mối quan hệ phi tuyến',
-        'Tối ưu hóa trực tiếp hàm loss function',
-        'Tự động xử lý missing values',
-        'Hiệu quả với dữ liệu có nhiều đặc trưng'
-      ],
-      disadvantages: [
-        'Dễ bị overfitting nếu không tune tham số tốt',
-        'Thời gian training lâu',
-        'Nhạy cảm với outliers và nhiễu',
-        'Khó giải thích và debug'
-      ],
-      useCase: 'Lựa chọn tốt cho các bài toán cần độ chính xác cao và có đủ dữ liệu để training',
-      color: '#faad14'
-    },
+    // TEMPORARILY DISABLED: Gradient Boosting
+    // {
+    //   key: 'gradient_boosting',
+    //   name: 'Gradient Boosting',
+    //   icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#faad14' }} />,
+    //   description: 'Thuật toán tăng cường gradient - xây dựng mô hình mạnh bằng cách kết hợp nhiều mô hình yếu',
+    //   advantages: [
+    //     'Độ chính xác rất cao',
+    //     'Xử lý tốt các mối quan hệ phi tuyến',
+    //     'Tối ưu hóa trực tiếp hàm loss function',
+    //     'Tự động xử lý missing values',
+    //     'Hiệu quả với dữ liệu có nhiều đặc trưng'
+    //   ],
+    //   disadvantages: [
+    //     'Dễ bị overfitting nếu không tune tham số tốt',
+    //     'Thời gian training lâu',
+    //     'Nhạy cảm với outliers và nhiễu',
+    //     'Khó giải thích và debug'
+    //   ],
+    //   useCase: 'Lựa chọn tốt cho các bài toán cần độ chính xác cao và có đủ dữ liệu để training',
+    //   color: '#faad14'
+    // },
     {
       key: 'knn',
       name: 'K-Nearest Neighbors (KNN)',

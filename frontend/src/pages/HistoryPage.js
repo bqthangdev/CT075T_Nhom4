@@ -1007,7 +1007,7 @@ const HistoryPage = () => {
                 {Array.isArray(newResult.models) && newResult.models.length > 0 && (
                   <Card title="📈 So sánh chi tiết từng thuật toán Machine Learning" size="small" style={{ marginBottom: 16 }}>
                     <Alert
-                      message={`So sánh ${newResult.models.length} thuật toán khác nhau`}
+                      message={`So sánh ${newResult.models.filter(m => m.name !== 'gradient_boosting').length} thuật toán khác nhau`}
                       description="Các thuật toán có chiến lược dự đoán khác nhau. Dữ liệu này để tham khảo và so sánh giữa các model."
                       type="info"
                       showIcon
@@ -1017,7 +1017,9 @@ const HistoryPage = () => {
                       pagination={false}
                       size="small"
                       scroll={{ x: 600 }}
-                      dataSource={newResult.models.map((m, idx) => ({ key: idx, ...m }))}
+                      dataSource={newResult.models
+                        .filter(m => m.name !== 'gradient_boosting')  // TEMPORARILY DISABLED: Gradient Boosting
+                        .map((m, idx) => ({ key: idx, ...m }))}
                       expandable={{
                         expandedRowRender: (record) => (
                           <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>

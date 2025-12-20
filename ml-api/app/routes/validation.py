@@ -34,11 +34,11 @@ def get_algorithms(config=None):
         config = load_config()
     
     if not config:
-        # Default config
+        # Default config (GRADIENT BOOSTING TEMPORARILY DISABLED)
         config = {
             "logistic_regression": {"max_iter": 1000, "solver": "liblinear", "C": 1.0, "random_state": 42},
             "random_forest": {"n_estimators": 100, "max_depth": None, "random_state": 42},
-            "gradient_boosting": {"n_estimators": 100, "learning_rate": 0.1, "random_state": 42},
+            # "gradient_boosting": {"n_estimators": 100, "learning_rate": 0.1, "random_state": 42},  # DISABLED
             "knn": {"n_neighbors": 5, "weights": "uniform"}
         }
     
@@ -60,12 +60,12 @@ def get_algorithms(config=None):
         ('classifier', RandomForestClassifier(**rf_params))
     ])
     
-    # Gradient Boosting
-    gb_params = config.get('gradient_boosting', {})
-    algorithms['Gradient Boosting'] = Pipeline([
-        ('scaler', StandardScaler()),
-        ('classifier', GradientBoostingClassifier(**gb_params))
-    ])
+    # TEMPORARILY DISABLED: Gradient Boosting
+    # gb_params = config.get('gradient_boosting', {})
+    # algorithms['Gradient Boosting'] = Pipeline([
+    #     ('scaler', StandardScaler()),
+    #     ('classifier', GradientBoostingClassifier(**gb_params))
+    # ])
     
     # KNN
     knn_params = config.get('knn', {})

@@ -41,9 +41,10 @@ const ModelConfigPage = () => {
       if (response.random_forest) {
         rfForm.setFieldsValue(response.random_forest);
       }
-      if (response.gradient_boosting) {
-        gbForm.setFieldsValue(response.gradient_boosting);
-      }
+      // TEMPORARILY DISABLED: Gradient Boosting
+      // if (response.gradient_boosting) {
+      //   gbForm.setFieldsValue(response.gradient_boosting);
+      // }
       if (response.knn) {
         knnForm.setFieldsValue(response.knn);
       }
@@ -61,13 +62,13 @@ const ModelConfigPage = () => {
     try {
       const lrValues = await lrForm.validateFields();
       const rfValues = await rfForm.validateFields();
-      const gbValues = await gbForm.validateFields();
+      // const gbValues = await gbForm.validateFields();  // TEMPORARILY DISABLED
       const knnValues = await knnForm.validateFields();
 
       const newConfig = {
         logistic_regression: lrValues,
         random_forest: rfValues,
-        gradient_boosting: gbValues,
+        // gradient_boosting: gbValues,  // TEMPORARILY DISABLED
         knn: knnValues,
       };
 
@@ -110,13 +111,13 @@ const ModelConfigPage = () => {
     try {
       const currentLR = lrForm.getFieldsValue();
       const currentRF = rfForm.getFieldsValue();
-      const currentGB = gbForm.getFieldsValue();
+      // const currentGB = gbForm.getFieldsValue();  // TEMPORARILY DISABLED
       const currentKNN = knnForm.getFieldsValue();
 
       const currentConfig = {
         logistic_regression: currentLR,
         random_forest: currentRF,
-        gradient_boosting: currentGB,
+        // gradient_boosting: currentGB,  // TEMPORARILY DISABLED
         knn: currentKNN,
       };
 
@@ -445,8 +446,8 @@ const ModelConfigPage = () => {
             </Form>
           </Panel>
 
-          {/* Gradient Boosting */}
-          <Panel header={<strong style={{ fontSize: 16 }}>🟡 Gradient Boosting</strong>} key="gb">
+          {/* TEMPORARILY DISABLED: Gradient Boosting */}
+          {/* <Panel header={<strong style={{ fontSize: 16 }}>🟡 Gradient Boosting</strong>} key="gb">
             <Form form={gbForm} layout="vertical">
               <div className="responsive-grid-3">
                 <Form.Item 
@@ -508,7 +509,7 @@ const ModelConfigPage = () => {
               </Form.Item>
               </div>
             </Form>
-          </Panel>
+          </Panel> */}
 
           {/* KNN */}
           <Panel header={<strong style={{ fontSize: 16 }}>🟣 K-Nearest Neighbors (KNN)</strong>} key="knn">
