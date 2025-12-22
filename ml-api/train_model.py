@@ -20,9 +20,9 @@ from sklearn.metrics import (
     mean_squared_error,
     confusion_matrix,
 )
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 
 DATA_PATH = Path('app/Dataset/healthcare-dataset-stroke-data.csv')
 MODEL_DIR = Path('app/models')
@@ -46,8 +46,10 @@ def load_data():
 
 
 def build_preprocessor():
+    # BMI imputer: Use normal BMI (22) instead of median (28.1 = overweight)
+    # Rationale: Normal BMI range is 18.5-24.9, using 22 is more medically neutral
     numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='median')),
+        ('imputer', SimpleImputer(strategy='constant', fill_value=22.0)),
     ])
 
     categorical_transformer = Pipeline(steps=[
@@ -75,32 +77,26 @@ def get_algorithms():
         except Exception as e:
             print(f'Failed to load config: {e}')
     
-    # Get params or use defaults
-    lr_params = config.get('logistic_regression', {
-        'max_iter': 1000, 'solver': 'liblinear', 'class_weight': 'balanced', 'C': 1.0, 'penalty': 'l2', 'random_state': 42
-    })
-    rf_params = config.get('random_forest', {
-        'n_estimators': 300, 'random_state': 42, 'class_weight': 'balanced'
-    })
-    # TEMPORARILY DISABLED: Gradient Boosting
-    # gb_params = config.get('gradient_boosting', {
-    #     'n_estimators': 100, 'learning_rate': 0.1, 'max_depth': 3, 'random_state': 42
-    # })
     knn_params = config.get('knn', {
         'n_neighbors': 15, 'weights': 'uniform', 'algorithm': 'auto'
     })
+    svm_params = config.get('svm', {
+        'C': 1.0, 'kernel': 'rbf', 'gamma': 'scale', 'class_weight': 'balanced', 'random_state': 42
+    })
+    dt_params = config.get('decision_tree', {
+        'max_depth': 8, 'min_samples_split': 15, 'min_samples_leaf': 7, 
+        'criterion': 'gini', 'class_weight': 'balanced', 'random_state': 42
+    })
     
-    # Remove None values for params
-    lr_params = {k: v for k, v in lr_params.items() if v is not None}
-    rf_params = {k: v for k, v in rf_params.items() if v is not None}
-    # gb_params = {k: v for k, v in gb_params.items() if v is not None}  # DISABLED
+    # Filter out None values
     knn_params = {k: v for k, v in knn_params.items() if v is not None}
+    svm_params = {k: v for k, v in svm_params.items() if v is not None}
+    dt_params = {k: v for k, v in dt_params.items() if v is not None}
     
     return {
-        'logistic_regression': LogisticRegression(**lr_params),
-        'random_forest': RandomForestClassifier(**rf_params),
-        # 'gradient_boosting': GradientBoostingClassifier(**gb_params),  # TEMPORARILY DISABLED
         'knn': KNeighborsClassifier(**knn_params),
+        'svm': SVC(**svm_params),  # probability already in config
+        'decision_tree': DecisionTreeClassifier(**dt_params),
     }
 
 

@@ -13,6 +13,9 @@ FEATURE_MAPPING = {
     'avgGlucoseLevel': 'avg_glucose_level',
     'heartDisease': 'heart_disease',
     'residenceType': 'Residence_type',
+    'everMarried': 'ever_married',
+    'workType': 'work_type',
+    'smokingStatus': 'smoking_status',
 }
 
 
@@ -135,31 +138,48 @@ class PredictionService:
         # Try models first
         model_scores = self._predict_with_models(adapted)
 
-        # Use Logistic Regression as the most reliable model for final diagnosis
-        # It's properly calibrated with class_weight='balanced' for imbalanced data
+        # UPDATED: Use average of all available models for final prediction
+        # Priority: SVM > KNN > Decision Tree > others
         score = None
         if model_scores:
-            # Prefer logistic_regression as it's the most reliable for stroke prediction
-            if 'logistic_regression' in model_scores:
-                score = model_scores['logistic_regression']
+            # Use SVM if available (best for imbalanced data)
+            if 'svm' in model_scores:
+                score = model_scores['svm']
+            elif 'knn' in model_scores:
+                score = model_scores['knn']
+            elif 'decision_tree' in model_scores:
+                score = model_scores['decision_tree']
             else:
-                # Fallback to average if logistic_regression not available
+                # Fallback to average of all models
                 score = sum(model_scores.values()) / len(model_scores)
 
         # Fallback heuristic if no model available
+        # Weights based on Feature Importance analysis (Top 5 features)
         if score is None:
             age = float(data.get('age', 0))
             glucose = float(data.get('avgGlucoseLevel', 0))
             bmi = float(data.get('bmi', 0))
+            ever_married = str(data.get('ever_married', data.get('everMarried', ''))).lower()
+            hypertension = str(data.get('hypertension', '')).lower()
 
             score = 0.0
-            score += min(age / 120.0, 1.0) * 0.35
-            score += min(glucose / 300.0, 1.0) * 0.35
-            score += min(bmi / 50.0, 1.0) * 0.20
-            if str(data.get('hypertension')).lower() in ['true', '1', 'yes']:
-                score += 0.07
-            if str(data.get('heartDisease')).lower() in ['true', '1', 'yes']:
-                score += 0.08
+            # Top 5 features by importance (total = 82.6%)
+            score += min(age / 120.0, 1.0) * 0.376        # 37.6% - Most important
+            score += min(glucose / 300.0, 1.0) * 0.20     # 20.0% - Second
+            score += min(bmi / 50.0, 1.0) * 0.177         # 17.7% - Third
+            
+            # Ever Married: Yes increases risk slightly (3.9%)
+            if ever_married in ['yes', 'true', '1']:
+                score += 0.039  # 3.9%
+            
+            # Hypertension (3.4%)
+            if hypertension in ['true', '1', 'yes']:
+                score += 0.034  # 3.4%
+            
+            # Heart Disease - not in top 5 but still relevant (~2.5%)
+            if str(data.get('heart_disease', data.get('heartDisease', ''))).lower() in ['true', '1', 'yes']:
+                score += 0.025  # ~2.5%
+            
             score = max(0.0, min(score, 1.0))
 
         risk_level = self._risk_level(score)

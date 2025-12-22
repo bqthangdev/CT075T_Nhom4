@@ -7,67 +7,6 @@ const { Panel } = Collapse;
 const AlgorithmsPage = () => {
   const algorithms = [
     {
-      key: 'logistic_regression',
-      name: 'Logistic Regression',
-      icon: <CheckCircleOutlined style={{ fontSize: 24, color: '#1890ff' }} />,
-      description: 'Thuật toán hồi quy logistic - một phương pháp thống kê cổ điển cho phân loại nhị phân',
-      advantages: [
-        'Đơn giản, dễ hiểu và giải thích',
-        'Tính toán nhanh, phù hợp với dữ liệu lớn',
-        'Cung cấp xác suất dự đoán rõ ràng',
-        'Ít bị overfitting với dữ liệu đơn giản'
-      ],
-      disadvantages: [
-        'Giả định mối quan hệ tuyến tính',
-        'Khó xử lý các mối quan hệ phức tạp',
-        'Nhạy cảm với outliers'
-      ],
-      useCase: 'Phù hợp cho dữ liệu có mối quan hệ tuyến tính giữa các đặc trưng và kết quả',
-      color: '#1890ff'
-    },
-    {
-      key: 'random_forest',
-      name: 'Random Forest',
-      icon: <TeamOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
-      description: 'Thuật toán rừng ngẫu nhiên - kết hợp nhiều cây quyết định để đưa ra dự đoán chính xác hơn',
-      advantages: [
-        'Độ chính xác cao với nhiều loại dữ liệu',
-        'Xử lý tốt dữ liệu không cân bằng',
-        'Tự động xử lý missing values',
-        'Giảm thiểu overfitting nhờ kỹ thuật ensemble',
-        'Đánh giá được tầm quan trọng của từng đặc trưng'
-      ],
-      disadvantages: [
-        'Tốn nhiều bộ nhớ và thời gian tính toán',
-        'Khó giải thích so với single tree',
-        'Có thể overfitting với dữ liệu nhiễu'
-      ],
-      useCase: 'Rất hiệu quả cho bài toán phức tạp với nhiều đặc trưng và dữ liệu không cân bằng',
-      color: '#52c41a'
-    },
-    // TEMPORARILY DISABLED: Gradient Boosting
-    // {
-    //   key: 'gradient_boosting',
-    //   name: 'Gradient Boosting',
-    //   icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#faad14' }} />,
-    //   description: 'Thuật toán tăng cường gradient - xây dựng mô hình mạnh bằng cách kết hợp nhiều mô hình yếu',
-    //   advantages: [
-    //     'Độ chính xác rất cao',
-    //     'Xử lý tốt các mối quan hệ phi tuyến',
-    //     'Tối ưu hóa trực tiếp hàm loss function',
-    //     'Tự động xử lý missing values',
-    //     'Hiệu quả với dữ liệu có nhiều đặc trưng'
-    //   ],
-    //   disadvantages: [
-    //     'Dễ bị overfitting nếu không tune tham số tốt',
-    //     'Thời gian training lâu',
-    //     'Nhạy cảm với outliers và nhiễu',
-    //     'Khó giải thích và debug'
-    //   ],
-    //   useCase: 'Lựa chọn tốt cho các bài toán cần độ chính xác cao và có đủ dữ liệu để training',
-    //   color: '#faad14'
-    // },
-    {
       key: 'knn',
       name: 'K-Nearest Neighbors (KNN)',
       icon: <ExperimentOutlined style={{ fontSize: 24, color: '#722ed1' }} />,
@@ -86,6 +25,48 @@ const AlgorithmsPage = () => {
       ],
       useCase: 'Phù hợp với dữ liệu có cấu trúc không gian rõ ràng và kích thước vừa phải',
       color: '#722ed1'
+    },
+    {
+      key: 'svm',
+      name: 'Support Vector Machine (SVM)',
+      icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
+      description: 'Máy vector hỗ trợ - tìm siêu phẳng tối ưu để phân tách các lớp dữ liệu với margin lớn nhất',
+      advantages: [
+        'Hiệu quả cao với dữ liệu nhiều chiều',
+        'Xử lý tốt class imbalance với class_weight',
+        'Robust với outliers nhờ soft margin',
+        'Kernel trick xử lý non-linear relationships',
+        'Độ chính xác cao cho imbalanced data'
+      ],
+      disadvantages: [
+        'Training chậm với dataset lớn',
+        'Cần feature scaling bắt buộc',
+        'Khó giải thích và visualize',
+        'Cần tune hyperparameters (C, gamma, kernel)'
+      ],
+      useCase: 'Tối ưu cho dữ liệu imbalanced, high-dimensional, cần accuracy cao',
+      color: '#fa8c16'
+    },
+    {
+      key: 'decision_tree',
+      name: 'Decision Tree',
+      icon: <TeamOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
+      description: 'Cây quyết định - phân loại theo cấu trúc cây với các điều kiện if-else dựa trên features',
+      advantages: [
+        'Dễ hiểu, visualize và giải thích',
+        'Không cần feature scaling',
+        'Xử lý tốt categorical features',
+        'Training và prediction nhanh',
+        'Tự động feature selection'
+      ],
+      disadvantages: [
+        'Dễ overfitting nếu không tune',
+        'Không ổn định, nhạy cảm với data thay đổi',
+        'Bias với imbalanced data',
+        'Accuracy thấp hơn ensemble methods'
+      ],
+      useCase: 'Baseline model, cần interpretability, mixed data types, fast prototyping',
+      color: '#52c41a'
     }
   ];
 
@@ -101,7 +82,7 @@ const AlgorithmsPage = () => {
       >
         <Alert
           message="📊 Phương pháp đánh giá đa thuật toán"
-          description="Hệ thống sử dụng 4 thuật toán Machine Learning khác nhau để phân tích cùng một bộ dữ liệu. Mỗi thuật toán có ưu điểm riêng và cung cấp góc nhìn khác nhau về nguy cơ đột quỵ. Kết quả cuối cùng là trung bình của tất cả các thuật toán, giúp tăng độ tin cậy và giảm thiểu sai số."
+          description="Hệ thống sử dụng 3 thuật toán Machine Learning: KNN (instance-based), SVM (margin-based), và Decision Tree (rule-based). Mỗi thuật toán có ưu điểm riêng: KNN đơn giản và trực quan, SVM xử lý tốt imbalanced data, Decision Tree dễ interpret. Kết quả tổng hợp từ các thuật toán giúp tăng độ tin cậy."
           type="info"
           showIcon
           style={{ marginBottom: 24 }}
@@ -109,7 +90,7 @@ const AlgorithmsPage = () => {
 
         <Collapse 
           accordion
-          defaultActiveKey={['logistic_regression']}
+          defaultActiveKey={['knn']}
           style={{ marginTop: 20 }}
         >
           {algorithms.map((algo) => (

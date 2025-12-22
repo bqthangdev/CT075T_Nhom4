@@ -1,22 +1,17 @@
 [
   {
-    "name": "logistic_regression",
-    "file": "app\\models\\logistic_regression.joblib",
-    "trained_at": "2025-12-20T11:36:42.625434Z"
-  },
-  {
-    "name": "random_forest",
-    "file": "app\\models\\random_forest.joblib",
-    "trained_at": "2025-12-20T11:36:43.462832Z"
-  },
-  {
-    "name": "gradient_boosting",
-    "file": "app\\models\\gradient_boosting.joblib",
-    "trained_at": "2025-12-20T11:36:43.893725Z"
-  },
-  {
     "name": "knn",
     "file": "app\\models\\knn.joblib",
-    "trained_at": "2025-12-20T11:36:45.736745Z"
+    "trained_at": "2025-12-22T07:31:16.816928Z"
+  },
+  {
+    "name": "svm",
+    "file": "app\\models\\svm.joblib",
+    "trained_at": "2025-12-22T07:31:20.655206Z"
+  },
+  {
+    "name": "decision_tree",
+    "file": "app\\models\\decision_tree.joblib",
+    "trained_at": "2025-12-22T07:31:20.738440Z"
   }
 ]

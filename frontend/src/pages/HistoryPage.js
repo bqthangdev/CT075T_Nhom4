@@ -996,8 +996,8 @@ const HistoryPage = () => {
                     </div>
                   </div>
                   <Alert
-                    message="Chẩn đoán từ thuật toán đáng tin cậy nhất"
-                    description="Kết quả dựa trên Logistic Regression với class_weight='balanced'"
+                    message="Chẩn đoán từ thuật toán KNN"
+                    description="Kết quả dựa trên K-Nearest Neighbors - thuật toán phân loại dựa trên sự tương đồng với các điểm dữ liệu lân cận"
                     type="success"
                     showIcon
                     style={{ marginTop: 12, fontSize: 12 }}
@@ -1007,8 +1007,8 @@ const HistoryPage = () => {
                 {Array.isArray(newResult.models) && newResult.models.length > 0 && (
                   <Card title="📈 So sánh chi tiết từng thuật toán Machine Learning" size="small" style={{ marginBottom: 16 }}>
                     <Alert
-                      message={`So sánh ${newResult.models.filter(m => m.name !== 'gradient_boosting').length} thuật toán khác nhau`}
-                      description="Các thuật toán có chiến lược dự đoán khác nhau. Dữ liệu này để tham khảo và so sánh giữa các model."
+                      message={`Sử dụng 3 thuật toán: KNN, SVM, Decision Tree`}
+                      description="Hệ thống sử dụng K-Nearest Neighbors, Support Vector Machine, và Decision Tree cho dự đoán."
                       type="info"
                       showIcon
                       style={{ marginBottom: 16 }}
@@ -1018,7 +1018,6 @@ const HistoryPage = () => {
                       size="small"
                       scroll={{ x: 600 }}
                       dataSource={newResult.models
-                        .filter(m => m.name !== 'gradient_boosting')  // TEMPORARILY DISABLED: Gradient Boosting
                         .map((m, idx) => ({ key: idx, ...m }))}
                       expandable={{
                         expandedRowRender: (record) => (
@@ -1041,10 +1040,9 @@ const HistoryPage = () => {
                           fixed: 'left',
                           render: (name) => {
                             const nameMap = {
-                              'logistic_regression': 'Logistic Regression',
-                              'random_forest': 'Random Forest',
-                              'gradient_boosting': 'Gradient Boosting',
-                              'knn': 'K-Nearest Neighbors'
+                              'knn': 'K-Nearest Neighbors',
+                              'svm': 'Support Vector Machine',
+                              'decision_tree': 'Decision Tree'
                             };
                             return <strong style={{ fontSize: '13px' }}>{nameMap[name] || name}</strong>;
                           }

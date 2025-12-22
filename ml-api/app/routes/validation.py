@@ -7,9 +7,9 @@ from pathlib import Path
 from sklearn.model_selection import cross_validate, KFold, train_test_split, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder, StandardScaler
 from sklearn.pipeline import Pipeline
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 
 validation_bp = Blueprint('validation', __name__)
@@ -34,44 +34,37 @@ def get_algorithms(config=None):
         config = load_config()
     
     if not config:
-        # Default config (GRADIENT BOOSTING TEMPORARILY DISABLED)
+        # Default config (KNN, SVM, Decision Tree active)
         config = {
-            "logistic_regression": {"max_iter": 1000, "solver": "liblinear", "C": 1.0, "random_state": 42},
-            "random_forest": {"n_estimators": 100, "max_depth": None, "random_state": 42},
-            # "gradient_boosting": {"n_estimators": 100, "learning_rate": 0.1, "random_state": 42},  # DISABLED
-            "knn": {"n_neighbors": 5, "weights": "uniform"}
+            "knn": {"n_neighbors": 15, "weights": "uniform"},
+            "svm": {"C": 1.0, "kernel": "rbf", "gamma": "scale", "class_weight": "balanced", "random_state": 42},
+            "decision_tree": {"max_depth": 8, "min_samples_split": 15, "min_samples_leaf": 7, "criterion": "gini", "class_weight": "balanced", "random_state": 42}
         }
     
     algorithms = {}
-    
-    # Logistic Regression
-    lr_params = config.get('logistic_regression', {})
-    algorithms['Logistic Regression'] = Pipeline([
-        ('scaler', StandardScaler()),
-        ('classifier', LogisticRegression(**lr_params))
-    ])
-    
-    # Random Forest
-    rf_params = config.get('random_forest', {})
-    if rf_params.get('max_depth') is None or rf_params.get('max_depth') == 'null':
-        rf_params['max_depth'] = None
-    algorithms['Random Forest'] = Pipeline([
-        ('scaler', StandardScaler()),
-        ('classifier', RandomForestClassifier(**rf_params))
-    ])
-    
-    # TEMPORARILY DISABLED: Gradient Boosting
-    # gb_params = config.get('gradient_boosting', {})
-    # algorithms['Gradient Boosting'] = Pipeline([
-    #     ('scaler', StandardScaler()),
-    #     ('classifier', GradientBoostingClassifier(**gb_params))
-    # ])
     
     # KNN
     knn_params = config.get('knn', {})
     algorithms['KNN'] = Pipeline([
         ('scaler', StandardScaler()),
         ('classifier', KNeighborsClassifier(**knn_params))
+    ])
+    
+    # SVM
+    svm_params = config.get('svm', {})
+    algorithms['SVM'] = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', SVC(**svm_params))  # probability already in config
+    ])
+    
+    # Decision Tree
+    dt_params = config.get('decision_tree', {})
+    # Handle max_features None
+    if dt_params.get('max_features') is None or dt_params.get('max_features') == 'null':
+        dt_params['max_features'] = None
+    algorithms['Decision Tree'] = Pipeline([
+        ('scaler', StandardScaler()),
+        ('classifier', DecisionTreeClassifier(**dt_params))
     ])
     
     return algorithms
