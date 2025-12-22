@@ -996,8 +996,8 @@ const HistoryPage = () => {
                     </div>
                   </div>
                   <Alert
-                    message="Chẩn đoán từ thuật toán KNN"
-                    description="Kết quả dựa trên K-Nearest Neighbors - thuật toán phân loại dựa trên sự tương đồng với các điểm dữ liệu lân cận"
+                    message="Chẩn đoán từ thuật toán tốt nhất (SVM)"
+                    description="Kết quả này dựa trên Support Vector Machine - thuật toán có độ chính xác cao nhất (ROC-AUC 83.26%, Recall 75.81%) với class_weight='balanced', phù hợp cho dữ liệu y tế imbalanced."
                     type="success"
                     showIcon
                     style={{ marginTop: 12, fontSize: 12 }}

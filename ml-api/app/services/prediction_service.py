@@ -18,6 +18,12 @@ FEATURE_MAPPING = {
     'smokingStatus': 'smoking_status',
 }
 
+MODEL_DISPLAY_NAMES = {
+    'knn': 'K-Nearest Neighbors (KNN)',
+    'svm': 'Support Vector Machine (SVM)',
+    'decision_tree': 'Decision Tree',
+}
+
 
 class PredictionService:
     def __init__(self):
@@ -125,7 +131,16 @@ class PredictionService:
                 'heart_disease', 'ever_married', 'work_type', 'Residence_type', 'smoking_status']
         # Ensure presence of keys
         row = {c: data.get(c) for c in cols}
-        return pd.DataFrame([row])
+        df = pd.DataFrame([row])
+        
+        # Convert numeric columns to float to match training data dtype
+        # This prevents dtype mismatch errors during prediction
+        numeric_cols = ['age', 'avg_glucose_level', 'bmi']
+        for col in numeric_cols:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').astype('float64')
+        
+        return df
 
     def predict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         # Validate
@@ -185,10 +200,10 @@ class PredictionService:
         risk_level = self._risk_level(score)
         recommendations = self._recommendations(data, score)
 
-        # Build models array with risk scores only (no training metrics)
+        # Build models array with display names
         models_arr = [
             {
-                'name': name,
+                'name': MODEL_DISPLAY_NAMES.get(name, name),
                 'riskScore': s,
                 'riskLevel': self._risk_level(s)
             }
