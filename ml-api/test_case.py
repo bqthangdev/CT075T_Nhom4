@@ -9,6 +9,13 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8', errors='replace')
 
+# Model-specific thresholds (same as in prediction_service.py)
+MODEL_THRESHOLDS = {
+    'K-Nearest Neighbors (KNN)': 0.5,
+    'Support Vector Machine (SVM)': 0.15,  # Optimized for imbalanced data
+    'Decision Tree': 0.5,
+}
+
 # Danh sách 20+ test cases
 test_cases = [
     {
@@ -454,11 +461,12 @@ def run_test_cases():
             # Analyze each model
             for model_pred in models_predictions:
                 model_name = model_pred.get('name', 'Unknown')
-                risk_score = model_pred.get('riskScore', 0)  # Fixed: use 'riskScore' not 'prediction'
+                risk_score = model_pred.get('riskScore', 0)
                 risk_level_from_model = model_pred.get('riskLevel', 'LOW')
                 
-                # Determine predicted class based on threshold
-                predicted_class = 1 if risk_score >= 0.5 else 0
+                # Use model-specific threshold
+                threshold = MODEL_THRESHOLDS.get(model_name, 0.5)
+                predicted_class = 1 if risk_score >= threshold else 0
                 
                 # Determine predicted risk level (use model's riskLevel or calculate)
                 predicted_level = risk_level_from_model
@@ -487,7 +495,7 @@ def run_test_cases():
                         'correct': is_correct
                     })
                     
-                    print(f"  {status} | {model_name:35s} | Risk: {risk_score*100:6.2f}% | Class: {predicted_class} | Level: {predicted_level:7s}")
+                    print(f"  {status} | {model_name:35s} | Risk: {risk_score*100:6.2f}% | Class: {predicted_class} | Level: {predicted_level:7s} | Threshold: {threshold}")
             
         except Exception as e:
             print(f"\n[ERROR] Case {i} FAILED: {e}")
