@@ -43,8 +43,8 @@ const PredictionPage = () => {
       message.warning('⚠️ Bạn đang gửi request khá nhanh. Vui lòng chờ giữa các lần chẩn đoán.');
     }
     
-    // Block after 5 requests in 1 minute
-    if (newCount >= 5) {
+    // Block after 10 requests in 1 minute
+    if (newCount >= 10) {
       setIsBlocked(true);
       const cooldown = 5; // 5 seconds cooldown
       setCooldownSeconds(cooldown);
@@ -79,6 +79,8 @@ const PredictionPage = () => {
     setLoading(true);
     try {
       const response = await api.predictStrokeRisk(payload);
+      console.log('[DEBUG] Prediction response:', response.data);
+      console.log('[DEBUG] Models array:', response.data.models);
       setResult(response.data);
       // Save normalized data for report generation (backend/report expects mg/dL)
       setPatientFormData(payload);
@@ -133,7 +135,7 @@ const PredictionPage = () => {
           style={{ marginBottom: 16 }}
         />
       )}
-      {requestCount >= 3 && !isBlocked && (
+      {requestCount >= 8 && !isBlocked && (
         <Alert
           message="⚠️ Cảnh báo: Đang gửi request quá nhanh"
           description={`Bạn đã gửi ${requestCount} request trong 1 phút. Sau 5 request, bạn sẽ phải chờ 5 giây.`}
@@ -483,8 +485,8 @@ const PredictionPage = () => {
               {isBlocked ? `Chờ ${cooldownSeconds}s...` : 'Chẩn đoán'}
             </Button>
             {requestCount > 0 && !isBlocked && (
-              <div style={{ marginTop: 8, fontSize: 12, textAlign: 'center', color: requestCount >= 3 ? '#ff4d4f' : '#999' }}>
-                Số request trong 1 phút: {requestCount}/5
+              <div style={{ marginTop: 8, fontSize: 12, textAlign: 'center', color: requestCount >= 10 ? '#ff4d4f' : '#999' }}>
+                Số request trong 1 phút: {requestCount}/10
               </div>
             )}
           </Form.Item>
@@ -516,10 +518,10 @@ const PredictionPage = () => {
             }
           >
             {(() => {
-              // Tìm kết quả của SVM - model tốt nhất
-              const svmResult = result.models?.find(m => m.name === 'Support Vector Machine (SVM)');
-              const displayRiskScore = svmResult ? svmResult.riskScore : result.riskScore;
-              const displayRiskLevel = svmResult ? svmResult.riskLevel : result.riskLevel;
+              // Tìm kết quả của Decision Tree - model tốt nhất (accuracy 67.5%)
+              const dtResult = result.models?.find(m => m.name === 'Decision Tree');
+              const displayRiskScore = dtResult ? dtResult.riskScore : result.riskScore;
+              const displayRiskLevel = dtResult ? dtResult.riskLevel : result.riskLevel;
               
               return (
                 <>
@@ -540,9 +542,28 @@ const PredictionPage = () => {
                       </span>
                     </div>
                   </div>
+                  
+                  {/* Classification Result */}
+                  {result.classificationResult && (
+                    <Alert
+                      message="Kết quả phân loại (Classification)"
+                      description={
+                        <span>
+                          Hệ thống đánh giá: <strong style={{ fontSize: 16, color: result.predictedClass === 1 ? '#ff4d4f' : '#52c41a' }}>
+                            {result.classificationResult}
+                          </strong>
+                          {result.predictedClass === 1 ? ' - Khuyến nghị kiểm tra và theo dõi sức khỏe.' : ' - Tiếp tục duy trì lối sống lành mạnh.'}
+                        </span>
+                      }
+                      type={result.predictedClass === 1 ? 'warning' : 'success'}
+                      showIcon
+                      style={{ marginBottom: 16, marginTop: 16 }}
+                    />
+                  )}
+                  
                   <Alert
-                    message="Chẩn đoán từ thuật toán tốt nhất (SVM)"
-                    description="Kết quả này chỉ hiển thị từ SVM - thuật toán có độ chính xác cao nhất (ROC-AUC 83.26%, Recall 75.81%) với class_weight='balanced', phù hợp cho dữ liệu y tế imbalanced. Xem bảng dưới để so sánh với các thuật toán khác."
+                    message="Chẩn đoán từ thuật toán tốt nhất (Decision Tree)"
+                    description={`Kết quả này từ Decision Tree - model có accuracy thực tế cao nhất (67.5% trên 40 test cases). Phát hiện HIGH risk chính xác 92.44%. Decision Tree được chọn làm model chính vì không underprediction như SVM/KNN. Xem bảng dưới để so sánh với các thuật toán khác.`}
                     type="success"
                     showIcon
                     style={{ marginTop: 16 }}
@@ -585,19 +606,13 @@ const PredictionPage = () => {
                     title: 'Thuật toán', 
                     dataIndex: 'name', 
                     key: 'name',
-                    width: 200,
+                    width: 250,
                     fixed: 'left',
                     render: (name) => {
-                      const nameMap = {
-                        'knn': 'K-Nearest Neighbors',
-                        'svm': 'Support Vector Machine',
-                        'decision_tree': 'Decision Tree'
-                      };
+                      // name đã là display name từ backend (ví dụ: "Support Vector Machine (SVM)")
                       return (
                         <div>
-                          <strong>{nameMap[name] || name}</strong>
-                          <br />
-                          <Tag color="blue" style={{ fontSize: '11px', marginTop: 4 }}>{name}</Tag>
+                          <strong>{name}</strong>
                         </div>
                       );
                     }
@@ -630,8 +645,9 @@ const PredictionPage = () => {
                     align: 'center',
                     width: 150,
                     render: (name) => {
-                      if (name === 'Support Vector Machine (SVM)') {
-                        return <Tag color="green" icon="⭐" style={{ fontSize: '13px', padding: '4px 12px' }}>Tốt nhất</Tag>;
+                      // name đã là display name, kiểm tra nếu chứa "Decision Tree"
+                      if (name && name.includes('Decision Tree')) {
+                        return <Tag color="green" style={{ fontSize: '13px', padding: '4px 12px' }}>⭐ Tốt nhất</Tag>;
                       }
                       return <Tag color="default" style={{ fontSize: '13px' }}>Tham khảo</Tag>;
                     }

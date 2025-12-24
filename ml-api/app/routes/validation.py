@@ -5,8 +5,10 @@ import numpy as np
 from flask import Blueprint, request, jsonify
 from pathlib import Path
 from sklearn.model_selection import cross_validate, KFold, train_test_split, StratifiedKFold
-from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.preprocessing import LabelEncoder, StandardScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
@@ -28,8 +30,41 @@ def load_config():
         print(f"[Config] Error loading config: {e}")
         return None
 
+def build_preprocessor():
+    """
+    Build preprocessing pipeline (SAME as train_model.py)
+    This will be used inside sklearn Pipeline to prevent data leakage
+    """
+    from sklearn.compose import ColumnTransformer
+    from sklearn.impute import SimpleImputer
+    from sklearn.preprocessing import OneHotEncoder
+    
+    NUM_COLS = ['age', 'avg_glucose_level', 'bmi']
+    CAT_COLS = ['gender', 'hypertension', 'heart_disease', 'ever_married',
+                'work_type', 'Residence_type', 'smoking_status']
+    
+    numeric_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='constant', fill_value=22.0)),
+    ])
+    
+    categorical_transformer = Pipeline(steps=[
+        ('imputer', SimpleImputer(strategy='most_frequent')),
+        ('onehot', OneHotEncoder(handle_unknown='ignore')),
+    ])
+    
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ('num', numeric_transformer, NUM_COLS),
+            ('cat', categorical_transformer, CAT_COLS),
+        ]
+    )
+    return preprocessor
+
 def get_algorithms(config=None):
-    """Get configured algorithms"""
+    """
+    Get configured algorithms wrapped in Pipelines with preprocessing
+    This prevents data leakage in cross-validation
+    """
     if config is None:
         config = load_config()
     
@@ -37,7 +72,7 @@ def get_algorithms(config=None):
         # Default config (KNN, SVM, Decision Tree active)
         config = {
             "knn": {"n_neighbors": 15, "weights": "uniform"},
-            "svm": {"C": 1.0, "kernel": "rbf", "gamma": "scale", "class_weight": "balanced", "random_state": 42},
+            "svm": {"C": 1.0, "kernel": "rbf", "gamma": "scale", "class_weight": "balanced", "random_state": 42, "probability": True},
             "decision_tree": {"max_depth": 8, "min_samples_split": 15, "min_samples_leaf": 7, "criterion": "gini", "class_weight": "balanced", "random_state": 42}
         }
     
@@ -45,32 +80,39 @@ def get_algorithms(config=None):
     
     # KNN
     knn_params = config.get('knn', {})
+    knn_params = {k: v for k, v in knn_params.items() if v is not None}
     algorithms['KNN'] = Pipeline([
-        ('scaler', StandardScaler()),
+        ('preprocessor', build_preprocessor()),  # Build new instance for each
         ('classifier', KNeighborsClassifier(**knn_params))
     ])
     
     # SVM
     svm_params = config.get('svm', {})
+    svm_params = {k: v for k, v in svm_params.items() if v is not None}
+    if 'probability' not in svm_params:
+        svm_params['probability'] = True
     algorithms['SVM'] = Pipeline([
-        ('scaler', StandardScaler()),
-        ('classifier', SVC(**svm_params))  # probability already in config
+        ('preprocessor', build_preprocessor()),  # Build new instance for each
+        ('classifier', SVC(**svm_params))
     ])
     
     # Decision Tree
     dt_params = config.get('decision_tree', {})
-    # Handle max_features None
-    if dt_params.get('max_features') is None or dt_params.get('max_features') == 'null':
-        dt_params['max_features'] = None
+    if dt_params.get('max_features') in [None, 'null', 'None']:
+        dt_params.pop('max_features', None)
+    dt_params = {k: v for k, v in dt_params.items() if v is not None}
     algorithms['Decision Tree'] = Pipeline([
-        ('scaler', StandardScaler()),
+        ('preprocessor', build_preprocessor()),  # Build new instance for each
         ('classifier', DecisionTreeClassifier(**dt_params))
     ])
     
     return algorithms
 
-def preprocess_data(df):
-    """Preprocess the dataset"""
+def prepare_data(df):
+    """
+    Basic data preparation (no fitting/transformation)
+    Only drop columns and select features
+    """
     # Make a copy to avoid modifying original
     df = df.copy()
     
@@ -78,39 +120,20 @@ def preprocess_data(df):
     if 'id' in df.columns:
         df = df.drop('id', axis=1)
     
-    # Handle missing values in BMI
-    if 'bmi' in df.columns:
-        df['bmi'].fillna(df['bmi'].median(), inplace=True)
-    
-    # Fill any other missing numerical values
-    numerical_cols = df.select_dtypes(include=[np.number]).columns
-    for col in numerical_cols:
-        if df[col].isnull().any():
-            df[col].fillna(df[col].median(), inplace=True)
-    
-    # Encode categorical variables
-    label_encoders = {}
-    categorical_cols = ['gender', 'ever_married', 'work_type', 'Residence_type', 'smoking_status']
-    
-    for col in categorical_cols:
-        if col in df.columns:
-            le = LabelEncoder()
-            # Fill missing categorical values with 'Unknown' before encoding
-            df[col] = df[col].fillna('Unknown').astype(str)
-            df[col] = le.fit_transform(df[col])
-            label_encoders[col] = le
+    # Drop rows with missing age or glucose (critical features)
+    df = df.dropna(subset=['age', 'avg_glucose_level'])
     
     # Separate features and target
-    if 'stroke' in df.columns:
-        X = df.drop('stroke', axis=1)
-        y = df['stroke']
-    else:
+    if 'stroke' not in df.columns:
         raise ValueError("Dataset must contain 'stroke' column")
     
-    # Final check: ensure no NaN values remain
-    if X.isnull().any().any():
-        print("[Warning] NaN values found after preprocessing, filling with 0")
-        X = X.fillna(0)
+    TARGET_COL = 'stroke'
+    NUM_COLS = ['age', 'avg_glucose_level', 'bmi']
+    CAT_COLS = ['gender', 'hypertension', 'heart_disease', 'ever_married',
+                'work_type', 'Residence_type', 'smoking_status']
+    
+    X = df[NUM_COLS + CAT_COLS]
+    y = df[TARGET_COL]
     
     return X, y
 
@@ -132,32 +155,33 @@ def kfold_validation():
         df = pd.read_csv(DATASET_FILE)
         print(f"[Validation] Loaded dataset with {len(df)} rows")
         
-        # Preprocess
-        X, y = preprocess_data(df)
+        # Prepare data (basic cleaning only, no fitting)
+        X, y = prepare_data(df)
         
         # Load configuration
         config = load_config()
-        algorithms = get_algorithms(config)
+        algorithms = get_algorithms(config)  # Returns Pipelines with preprocessing
         
-        # Define scoring metrics with handling for imbalanced data
+        # Define scoring metrics for binary classification
+        # For imbalanced data, we use binary (positive class only) not macro average
         scoring = {
             'accuracy': 'accuracy',
-            'precision': 'precision_macro',  # Use macro average for imbalanced data
-            'recall': 'recall_macro',
-            'f1': 'f1_macro',
+            'precision': 'precision',  # Binary: only positive class (stroke)
+            'recall': 'recall',        # Binary: only positive class (stroke)
+            'f1': 'f1',                # Binary: only positive class (stroke)
             'roc_auc': 'roc_auc'
         }
         
         # Perform K-Fold Cross Validation for each algorithm
         results = {}
-        kfold = KFold(n_splits=k_folds, shuffle=True, random_state=42)
+        kfold = StratifiedKFold(n_splits=k_folds, shuffle=True, random_state=42)
         
-        for name, pipeline in algorithms.items():
+        for name, pipeline in algorithms.items():  # Use pipeline
             print(f"[Validation] Running K-Fold for {name}...")
             
             try:
                 cv_results = cross_validate(
-                    pipeline, X, y,
+                    pipeline, X, y,  # Pipeline will handle preprocessing per fold
                     cv=kfold,
                     scoring=scoring,
                     return_train_score=True,
@@ -252,13 +276,13 @@ def holdout_validation():
         df = pd.read_csv(DATASET_FILE)
         print(f"[Validation] Loaded dataset with {len(df)} rows")
         
-        # Preprocess data using the same function as K-Fold
-        X, y = preprocess_data(df)
+        # Prepare data (basic cleaning only)
+        X, y = prepare_data(df)
         
-        # Split data
+        # Split data (70% train, 30% test)
         X_train, X_test, y_train, y_test = train_test_split(
             X, y, 
-            test_size=test_size, 
+            test_size=test_size if test_size else 0.30,  # Mặc định 30% test
             random_state=random_state,
             stratify=y  # Đảm bảo tỷ lệ class giống nhau ở train và test
         )
@@ -266,13 +290,13 @@ def holdout_validation():
         print(f"[Validation] Train samples: {len(X_train)} (Stroke: {y_train.sum()}, No stroke: {(1-y_train).sum()})")
         print(f"[Validation] Test samples: {len(X_test)} (Stroke: {y_test.sum()}, No stroke: {(1-y_test).sum()})")
         
-        # Get configured algorithms
+        # Get configured algorithms (Pipelines with preprocessing)
         config = load_config()
         algorithms = get_algorithms(config)
         
         # Evaluate each algorithm
         results = {}
-        for name, pipeline in algorithms.items():
+        for name, pipeline in algorithms.items():  # Use pipeline
             print(f"[Validation] Running Holdout for {name}...")
             
             try:
@@ -284,19 +308,19 @@ def holdout_validation():
                 y_test_pred = pipeline.predict(X_test)
                 y_test_proba = pipeline.predict_proba(X_test)[:, 1] if hasattr(pipeline, 'predict_proba') else None
                 
-                # Calculate metrics
+                # Calculate metrics (binary classification - positive class only)
                 train_metrics = {
                     'accuracy': float(accuracy_score(y_train, y_train_pred)),
-                    'precision': float(precision_score(y_train, y_train_pred, average='macro', zero_division=0)),
-                    'recall': float(recall_score(y_train, y_train_pred, average='macro', zero_division=0)),
-                    'f1': float(f1_score(y_train, y_train_pred, average='macro', zero_division=0))
+                    'precision': float(precision_score(y_train, y_train_pred, zero_division=0)),
+                    'recall': float(recall_score(y_train, y_train_pred, zero_division=0)),
+                    'f1': float(f1_score(y_train, y_train_pred, zero_division=0))
                 }
                 
                 test_metrics = {
                     'accuracy': float(accuracy_score(y_test, y_test_pred)),
-                    'precision': float(precision_score(y_test, y_test_pred, average='macro', zero_division=0)),
-                    'recall': float(recall_score(y_test, y_test_pred, average='macro', zero_division=0)),
-                    'f1': float(f1_score(y_test, y_test_pred, average='macro', zero_division=0))
+                    'precision': float(precision_score(y_test, y_test_pred, zero_division=0)),
+                    'recall': float(recall_score(y_test, y_test_pred, zero_division=0)),
+                    'f1': float(f1_score(y_test, y_test_pred, zero_division=0))
                 }
                 
                 if y_test_proba is not None:

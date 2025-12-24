@@ -129,17 +129,21 @@ class PredictionService:
         # The training uses these columns
         cols = ['age', 'avg_glucose_level', 'bmi', 'gender', 'hypertension',
                 'heart_disease', 'ever_married', 'work_type', 'Residence_type', 'smoking_status']
-        # Ensure presence of keys
-        row = {c: data.get(c) for c in cols}
+        
+        # Prepare row with proper type conversion BEFORE creating DataFrame
+        row = {}
+        for c in cols:
+            val = data.get(c)
+            # Convert boolean to int immediately
+            if c in ['hypertension', 'heart_disease']:
+                row[c] = int(val) if isinstance(val, bool) else val
+            # Convert numeric to float
+            elif c in ['age', 'avg_glucose_level', 'bmi']:
+                row[c] = float(val) if val is not None else None
+            else:
+                row[c] = val
+        
         df = pd.DataFrame([row])
-        
-        # Convert numeric columns to float to match training data dtype
-        # This prevents dtype mismatch errors during prediction
-        numeric_cols = ['age', 'avg_glucose_level', 'bmi']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce').astype('float64')
-        
         return df
 
     def predict(self, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -153,20 +157,26 @@ class PredictionService:
         # Try models first
         model_scores = self._predict_with_models(adapted)
 
-        # UPDATED: Use average of all available models for final prediction
-        # Priority: SVM > KNN > Decision Tree > others
+        # UPDATED: Use Decision Tree as primary (best accuracy in testing)
+        # Based on evaluation results:
+        # - Decision Tree: 92.44% accuracy on high-risk cases
+        # - SVM: Only 25.47% (underpredicts risk)
+        # - KNN: Only 20% (underpredicts risk)
         score = None
         if model_scores:
-            # Use SVM if available (best for imbalanced data)
-            if 'svm' in model_scores:
+            # Priority: Decision Tree > Ensemble Average > SVM > KNN
+            if 'decision_tree' in model_scores:
+                score = model_scores['decision_tree']
+            elif len(model_scores) >= 2:
+                # Use ensemble average if Decision Tree not available
+                score = sum(model_scores.values()) / len(model_scores)
+            elif 'svm' in model_scores:
                 score = model_scores['svm']
             elif 'knn' in model_scores:
                 score = model_scores['knn']
-            elif 'decision_tree' in model_scores:
-                score = model_scores['decision_tree']
             else:
-                # Fallback to average of all models
-                score = sum(model_scores.values()) / len(model_scores)
+                # Fallback to first available model
+                score = list(model_scores.values())[0]
 
         # Fallback heuristic if no model available
         # Weights based on Feature Importance analysis (Top 5 features)
@@ -199,6 +209,11 @@ class PredictionService:
 
         risk_level = self._risk_level(score)
         recommendations = self._recommendations(data, score)
+        
+        # Determine predicted class (0 or 1) based on probability threshold
+        # Standard threshold: >= 0.5 means "Has Risk" (class 1)
+        predicted_class = 1 if score >= 0.5 else 0
+        classification_result = 'Có nguy cơ' if predicted_class == 1 else 'Không có nguy cơ'
 
         # Build models array with display names
         models_arr = [
@@ -214,6 +229,8 @@ class PredictionService:
             **data,
             'strokeRisk': score,
             'prediction': risk_level,
+            'predictedClass': predicted_class,  # 0 or 1
+            'classificationResult': classification_result,  # 'Có nguy cơ' or 'Không có nguy cơ'
             'models': models_arr,  # Save detailed algorithm comparison
             'recommendations': recommendations,  # Save health recommendations
             'createdAt': datetime.utcnow().isoformat() + 'Z'
@@ -233,6 +250,8 @@ class PredictionService:
         return {
             'riskScore': score,
             'riskLevel': risk_level,
+            'predictedClass': predicted_class,
+            'classificationResult': classification_result,
             'models': models_arr,
             'recommendations': recommendations
         }

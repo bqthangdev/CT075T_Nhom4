@@ -1,0 +1,37 @@
+{
+  "best_model": "svm",
+  "best_score": 0.5770869452772139,
+  "ranking": [
+    {
+      "rank": 1,
+      "model": "svm",
+      "score": 0.5770869452772139,
+      "roc_auc": 0.835647005029721,
+      "f1_score": 0.19829059829059828,
+      "sensitivity": 0.7733333333333333,
+      "specificity": 0.6899862825788752
+    },
+    {
+      "rank": 2,
+      "model": "decision_tree",
+      "score": 0.49493351623228166,
+      "roc_auc": 0.6965523548239597,
+      "f1_score": 0.19111111111111112,
+      "sensitivity": 0.5733333333333334,
+      "specificity": 0.7722908093278463
+    },
+    {
+      "rank": 3,
+      "model": "knn",
+      "score": 0.3677876085962506,
+      "roc_auc": 0.7651074531321446,
+      "f1_score": 0.0,
+      "sensitivity": 0.0,
+      "specificity": 1.0
+    }
+  ],
+  "recommendation": {
+    "use_model": "svm",
+    "reason": "Highest composite score (0.5771) with best balance of metrics"
+  }
+}

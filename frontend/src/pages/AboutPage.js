@@ -39,11 +39,35 @@ const AboutPage = () => {
             </ul>
           </Paragraph>
           <Paragraph>
-            <strong>Backend:</strong>
+            <strong>Backend API:</strong>
             <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
-              <li>Node.js - Runtime environment</li>
-              <li>Express.js - Web framework</li>
-              <li>MongoDB - Database</li>
+              <li>Flask (Python) - REST API framework</li>
+              <li>scikit-learn 1.8.0 - Machine Learning</li>
+              <li>pandas, numpy - Data processing</li>
+            </ul>
+          </Paragraph>
+          <Paragraph>
+            <strong>Machine Learning Models:</strong>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
+              <li>⭐ <strong>Decision Tree</strong> - Model chính (67.5% accuracy)</li>
+              <li>Support Vector Machine (SVM) - Model hỗ trợ (ROC-AUC 0.836)</li>
+              <li>K-Nearest Neighbors (KNN) - Model hỗ trợ (Specificity 100%)</li>
+            </ul>
+          </Paragraph>
+          <Paragraph>
+            <strong>Phương pháp đánh giá:</strong>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
+              <li>K-Fold Cross Validation (k=5) - Đánh giá toàn diện</li>
+              <li>Holdout Validation (70/30) - Training model cuối cùng</li>
+              <li>Stratified sampling - Đảm bảo tỷ lệ class cân bằng</li>
+            </ul>
+          </Paragraph>
+          <Paragraph>
+            <strong>Xử lý dữ liệu thiếu:</strong>
+            <ul style={{ textAlign: 'left', paddingLeft: 20 }}>
+              <li>BMI: Imputation bằng giá trị cố định 22 (BMI bình thường)</li>
+              <li>Categorical: Imputation bằng Mode (giá trị phổ biến nhất)</li>
+              <li>Pipeline đảm bảo không có Data Leakage</li>
             </ul>
           </Paragraph>
 

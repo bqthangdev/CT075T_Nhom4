@@ -727,6 +727,14 @@ const HistoryPage = () => {
                   <strong>Mức độ rủi ro:</strong> <Tag color={getRiskColor(selectedRecord.prediction)}>{getRiskLabelVi(selectedRecord.prediction)}</Tag>
                 </div>
                 <div><strong>Điểm rủi ro:</strong> <strong style={{ fontSize: 16, color: '#1890ff' }}>{(selectedRecord.strokeRisk * 100).toFixed(2)}%</strong></div>
+                {selectedRecord.classificationResult && (
+                  <div>
+                    <strong>Phân loại:</strong> 
+                    <Tag color={selectedRecord.predictedClass === 1 ? 'red' : 'green'} style={{ marginLeft: 8, fontSize: 13, padding: '2px 8px' }}>
+                      {selectedRecord.classificationResult}
+                    </Tag>
+                  </div>
+                )}
               </div>
             </Card>
 
@@ -995,9 +1003,26 @@ const HistoryPage = () => {
                       </strong>
                     </div>
                   </div>
+                  
+                  {newResult.classificationResult && (
+                    <Alert
+                      message="Kết quả phân loại (Classification)"
+                      description={
+                        <span>
+                          Hệ thống đánh giá: <strong style={{ color: newResult.predictedClass === 1 ? '#ff4d4f' : '#52c41a' }}>
+                            {newResult.classificationResult}
+                          </strong>
+                        </span>
+                      }
+                      type={newResult.predictedClass === 1 ? 'warning' : 'success'}
+                      showIcon
+                      style={{ marginTop: 12, marginBottom: 12 }}
+                    />
+                  )}
+                  
                   <Alert
-                    message="Chẩn đoán từ thuật toán tốt nhất (SVM)"
-                    description="Kết quả này dựa trên Support Vector Machine - thuật toán có độ chính xác cao nhất (ROC-AUC 83.26%, Recall 75.81%) với class_weight='balanced', phù hợp cho dữ liệu y tế imbalanced."
+                    message="Chẩn đoán từ thuật toán tốt nhất (Decision Tree)"
+                    description="Kết quả này dựa trên Decision Tree - model có accuracy thực tế cao nhất (67.5% trên 40 test cases). Phát hiện HIGH risk chính xác 92.44%. Decision Tree được chọn làm model chính vì không underprediction như SVM/KNN."
                     type="success"
                     showIcon
                     style={{ marginTop: 12, fontSize: 12 }}
@@ -1036,15 +1061,11 @@ const HistoryPage = () => {
                           title: 'Thuật toán', 
                           dataIndex: 'name', 
                           key: 'name',
-                          width: 200,
+                          width: 250,
                           fixed: 'left',
                           render: (name) => {
-                            const nameMap = {
-                              'knn': 'K-Nearest Neighbors',
-                              'svm': 'Support Vector Machine',
-                              'decision_tree': 'Decision Tree'
-                            };
-                            return <strong style={{ fontSize: '13px' }}>{nameMap[name] || name}</strong>;
+                            // name đã là display name từ backend
+                            return <strong style={{ fontSize: '13px' }}>{name}</strong>;
                           }
                         },
                         { 
