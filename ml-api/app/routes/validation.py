@@ -30,22 +30,30 @@ def load_config():
         print(f"[Config] Error loading config: {e}")
         return None
 
-def build_preprocessor():
+def build_preprocessor(scale_features=False):
     """
     Build preprocessing pipeline (SAME as train_model.py)
     This will be used inside sklearn Pipeline to prevent data leakage
+    
+    Args:
+        scale_features: If True, add StandardScaler for SVM (required for RBF kernel)
     """
     from sklearn.compose import ColumnTransformer
     from sklearn.impute import SimpleImputer
-    from sklearn.preprocessing import OneHotEncoder
+    from sklearn.preprocessing import OneHotEncoder, StandardScaler
     
     NUM_COLS = ['age', 'avg_glucose_level', 'bmi']
     CAT_COLS = ['gender', 'hypertension', 'heart_disease', 'ever_married',
                 'work_type', 'Residence_type', 'smoking_status']
     
-    numeric_transformer = Pipeline(steps=[
-        ('imputer', SimpleImputer(strategy='constant', fill_value=22.0)),
-    ])
+    # Build numeric transformer steps
+    steps = [('imputer', SimpleImputer(strategy='constant', fill_value=22.0))]
+    
+    # Add StandardScaler for SVM (SVM requires scaled features for RBF kernel)
+    if scale_features:
+        steps.append(('scaler', StandardScaler()))
+    
+    numeric_transformer = Pipeline(steps=steps)
     
     categorical_transformer = Pipeline(steps=[
         ('imputer', SimpleImputer(strategy='most_frequent')),
@@ -70,10 +78,25 @@ def get_algorithms(config=None):
     
     if not config:
         # Default config (KNN, SVM, Decision Tree active)
+        # IMPORTANT: These must match model_config.json and train_model.py
         config = {
             "knn": {"n_neighbors": 15, "weights": "uniform"},
-            "svm": {"C": 1.0, "kernel": "rbf", "gamma": "scale", "class_weight": "balanced", "random_state": 42, "probability": True},
-            "decision_tree": {"max_depth": 8, "min_samples_split": 15, "min_samples_leaf": 7, "criterion": "gini", "class_weight": "balanced", "random_state": 42}
+            "svm": {
+                "C": 0.1,  # OPTIMIZED: Softer margin (was 1.0)
+                "kernel": "rbf", 
+                "gamma": "0.1", 
+                "class_weight": "balanced", 
+                "random_state": 42, 
+                "probability": True
+            },
+            "decision_tree": {
+                "max_depth": 8, 
+                "min_samples_split": 15, 
+                "min_samples_leaf": 7, 
+                "criterion": "gini", 
+                "class_weight": "balanced", 
+                "random_state": 42
+            }
         }
     
     algorithms = {}
@@ -82,17 +105,17 @@ def get_algorithms(config=None):
     knn_params = config.get('knn', {})
     knn_params = {k: v for k, v in knn_params.items() if v is not None}
     algorithms['KNN'] = Pipeline([
-        ('preprocessor', build_preprocessor()),  # Build new instance for each
+        ('preprocessor', build_preprocessor(scale_features=False)),
         ('classifier', KNeighborsClassifier(**knn_params))
     ])
     
-    # SVM
+    # SVM - IMPORTANT: Use scaled features for RBF kernel
     svm_params = config.get('svm', {})
     svm_params = {k: v for k, v in svm_params.items() if v is not None}
     if 'probability' not in svm_params:
         svm_params['probability'] = True
     algorithms['SVM'] = Pipeline([
-        ('preprocessor', build_preprocessor()),  # Build new instance for each
+        ('preprocessor', build_preprocessor(scale_features=True)),  # Scale for SVM
         ('classifier', SVC(**svm_params))
     ])
     
@@ -102,7 +125,7 @@ def get_algorithms(config=None):
         dt_params.pop('max_features', None)
     dt_params = {k: v for k, v in dt_params.items() if v is not None}
     algorithms['Decision Tree'] = Pipeline([
-        ('preprocessor', build_preprocessor()),  # Build new instance for each
+        ('preprocessor', build_preprocessor(scale_features=False)),
         ('classifier', DecisionTreeClassifier(**dt_params))
     ])
     
@@ -169,7 +192,9 @@ def kfold_validation():
             'precision': 'precision',  # Binary: only positive class (stroke)
             'recall': 'recall',        # Binary: only positive class (stroke)
             'f1': 'f1',                # Binary: only positive class (stroke)
-            'roc_auc': 'roc_auc'
+            'roc_auc': 'roc_auc',
+            'neg_mean_absolute_error': 'neg_mean_absolute_error',  # MAE (negated)
+            'neg_root_mean_squared_error': 'neg_root_mean_squared_error'  # RMSE (negated)
         }
         
         # Perform K-Fold Cross Validation for each algorithm
@@ -188,6 +213,27 @@ def kfold_validation():
                     n_jobs=-1,
                     error_score='raise'  # Raise errors to catch them
                 )
+                
+                # Calculate confusion matrix across all folds
+                y_true_all = []
+                y_pred_all = []
+                for train_idx, test_idx in kfold.split(X, y):
+                    X_train_fold = X.iloc[train_idx] if hasattr(X, 'iloc') else X[train_idx]
+                    X_test_fold = X.iloc[test_idx] if hasattr(X, 'iloc') else X[test_idx]
+                    y_train_fold = y.iloc[train_idx] if hasattr(y, 'iloc') else y[train_idx]
+                    y_test_fold = y.iloc[test_idx] if hasattr(y, 'iloc') else y[test_idx]
+                    
+                    # Clone and fit pipeline for this fold
+                    from sklearn.base import clone
+                    fold_pipeline = clone(pipeline)
+                    fold_pipeline.fit(X_train_fold, y_train_fold)
+                    y_pred_fold = fold_pipeline.predict(X_test_fold)
+                    
+                    y_true_all.extend(y_test_fold)
+                    y_pred_all.extend(y_pred_fold)
+                
+                # Calculate overall confusion matrix
+                cm = confusion_matrix(y_true_all, y_pred_all)
                 
                 # Calculate statistics for each metric
                 results[name] = {
@@ -216,9 +262,25 @@ def kfold_validation():
                         'std': float(np.std(cv_results['test_roc_auc'])),
                         'folds': [float(x) for x in cv_results['test_roc_auc']]
                     },
+                    'mae': {
+                        'mean': float(-np.mean(cv_results['test_neg_mean_absolute_error'])),  # Convert back to positive
+                        'std': float(np.std(cv_results['test_neg_mean_absolute_error'])),
+                        'folds': [float(-x) for x in cv_results['test_neg_mean_absolute_error']]
+                    },
+                    'rmse': {
+                        'mean': float(-np.mean(cv_results['test_neg_root_mean_squared_error'])),  # Convert back to positive
+                        'std': float(np.std(cv_results['test_neg_root_mean_squared_error'])),
+                        'folds': [float(-x) for x in cv_results['test_neg_root_mean_squared_error']]
+                    },
                     'train_accuracy': {
                         'mean': float(np.mean(cv_results['train_accuracy'])),
                         'std': float(np.std(cv_results['train_accuracy']))
+                    },
+                    'confusion_matrix': {
+                        'tn': int(cm[0][0]),
+                        'fp': int(cm[0][1]),
+                        'fn': int(cm[1][0]),
+                        'tp': int(cm[1][1])
                     }
                 }
                 
@@ -309,18 +371,24 @@ def holdout_validation():
                 y_test_proba = pipeline.predict_proba(X_test)[:, 1] if hasattr(pipeline, 'predict_proba') else None
                 
                 # Calculate metrics (binary classification - positive class only)
+                from sklearn.metrics import mean_absolute_error, mean_squared_error
+                
                 train_metrics = {
                     'accuracy': float(accuracy_score(y_train, y_train_pred)),
                     'precision': float(precision_score(y_train, y_train_pred, zero_division=0)),
                     'recall': float(recall_score(y_train, y_train_pred, zero_division=0)),
-                    'f1': float(f1_score(y_train, y_train_pred, zero_division=0))
+                    'f1': float(f1_score(y_train, y_train_pred, zero_division=0)),
+                    'mae': float(mean_absolute_error(y_train, y_train_pred)),
+                    'rmse': float(np.sqrt(mean_squared_error(y_train, y_train_pred)))
                 }
                 
                 test_metrics = {
                     'accuracy': float(accuracy_score(y_test, y_test_pred)),
                     'precision': float(precision_score(y_test, y_test_pred, zero_division=0)),
                     'recall': float(recall_score(y_test, y_test_pred, zero_division=0)),
-                    'f1': float(f1_score(y_test, y_test_pred, zero_division=0))
+                    'f1': float(f1_score(y_test, y_test_pred, zero_division=0)),
+                    'mae': float(mean_absolute_error(y_test, y_test_pred)),
+                    'rmse': float(np.sqrt(mean_squared_error(y_test, y_test_pred)))
                 }
                 
                 if y_test_proba is not None:

@@ -12,7 +12,7 @@ if sys.platform == 'win32':
 # Model-specific thresholds (same as in prediction_service.py)
 MODEL_THRESHOLDS = {
     'K-Nearest Neighbors (KNN)': 0.5,
-    'Support Vector Machine (SVM)': 0.15,  # Optimized for imbalanced data
+    'Support Vector Machine (SVM)': 0.10,  # IMPROVED: Optimized threshold for new SVM with dual calibration
     'Decision Tree': 0.5,
 }
 

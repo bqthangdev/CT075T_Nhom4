@@ -4,13 +4,9 @@
     "decision_tree": 0.5,
     "knn": 0.5
   },
-  "notes": {
-    "svm": "Optimal threshold found by ROC analysis - balances recall (62.65%) and precision (34.29%)",
-    "decision_tree": "Standard threshold works well for this model",
-    "knn": "Standard threshold, though KNN has poor performance overall"
-  },
   "alternative_thresholds": {
-    "svm_high_recall": 0.10,
-    "svm_optimal_youden": 0.0787
+    "svm_high_recall": 0.05,
+    "svm_optimal_f1": 0.10,
+    "svm_optimal_youden": 0.0979
   }
 }

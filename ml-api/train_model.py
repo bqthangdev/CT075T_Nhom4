@@ -25,6 +25,8 @@ from sklearn.metrics import (
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
+from imblearn.over_sampling import SMOTE
+from imblearn.pipeline import Pipeline as ImbPipeline
 
 DATA_PATH = Path('app/Dataset/healthcare-dataset-stroke-data.csv')
 MODEL_DIR = Path('app/models')
@@ -91,14 +93,17 @@ def get_algorithms():
         except Exception as e:
             print(f'Failed to load config: {e}')
     
+    # Default parameters (used if config file not found or incomplete)
+    # These match the optimized values in model_config.json
     knn_params = config.get('knn', {
         'n_neighbors': 15, 'weights': 'uniform', 'algorithm': 'auto'
     })
     svm_params = config.get('svm', {
-        'C': 2.0,
-        'kernel': 'linear',  # Try linear kernel instead of RBF
-        'class_weight': {0: 1, 1: 20},
-        'probability': True,
+        'C': 0.1,  # Softer margin - reduces overfitting to majority class
+        'kernel': 'rbf',
+        'class_weight': 'balanced',
+        'gamma': '0.1',
+        'probability': True,  # Enable for dual calibration (Platt + Isotonic)
         'random_state': 42
     })
     dt_params = config.get('decision_tree', {
@@ -106,10 +111,10 @@ def get_algorithms():
         'criterion': 'gini', 'class_weight': 'balanced', 'random_state': 42
     })
     
-    # Filter out None values
-    knn_params = {k: v for k, v in knn_params.items() if v is not None}
-    svm_params = {k: v for k, v in svm_params.items() if v is not None}
-    dt_params = {k: v for k, v in dt_params.items() if v is not None}
+    # Filter out None values and comment keys (starting with _)
+    knn_params = {k: v for k, v in knn_params.items() if v is not None and not k.startswith('_')}
+    svm_params = {k: v for k, v in svm_params.items() if v is not None and not k.startswith('_')}
+    dt_params = {k: v for k, v in dt_params.items() if v is not None and not k.startswith('_')}
     
     return {
         'knn': KNeighborsClassifier(**knn_params),
@@ -148,6 +153,12 @@ def train():
 
     for name, clf in algos.items():
         print(f'\n>>> K-Fold for {name.upper()}...')
+        
+        # Skip K-Fold for SVM (will use SMOTE in holdout instead)
+        if name == 'svm':
+            print('   Skipping K-Fold for SVM (will use SMOTE + Isotonic in holdout training)')
+            kfold_results[name] = None
+            continue
         
         # Use scaled preprocessor for SVM
         prep = build_preprocessor(scale_features=(name == 'svm'))
@@ -193,6 +204,7 @@ def train():
         # Use scaled preprocessor for SVM
         prep = build_preprocessor(scale_features=(name == 'svm'))
         
+        # Standard pipeline for all models now
         pipeline = Pipeline(steps=[
             ('preprocessor', prep),
             ('model', clf)
@@ -200,7 +212,20 @@ def train():
         
         # Fit the pipeline
         pipeline.fit(X_train, y_train)
-        final_model = pipeline
+        
+        # For SVM: Apply Isotonic recalibration on top of Platt scaling
+        if name == 'svm':
+            print('  >> Applying Isotonic Recalibration on SVM probabilities...')
+            final_model = CalibratedClassifierCV(
+                pipeline,
+                method='isotonic',  # Isotonic regression to fix Platt scaling bias
+                cv=3,  # 3-fold CV 
+                ensemble=False  # Single calibrated model
+            )
+            final_model.fit(X_train, y_train)
+            print('  >> SVM with dual calibration (Platt + Isotonic) completed')
+        else:
+            final_model = pipeline
 
         # Evaluation
         y_pred = final_model.predict(X_test)

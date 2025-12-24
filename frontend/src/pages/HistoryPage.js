@@ -768,6 +768,21 @@ const HistoryPage = () => {
                   columns={[
                     { title: 'Thuật toán', dataIndex: 'name', key: 'name', width: 200, fixed: 'left', 
                       render: (name) => <Tag color="blue" style={{ fontSize: 14 }}>{name}</Tag> },
+                    { 
+                      title: 'Kết quả phân loại', 
+                      dataIndex: 'predictedClass', 
+                      key: 'predictedClass',
+                      align: 'center',
+                      width: 150,
+                      render: (predictedClass) => {
+                        const hasRisk = predictedClass === 1;
+                        return (
+                          <Tag color={hasRisk ? 'red' : 'green'} style={{ fontSize: '14px', padding: '4px 12px' }}>
+                            {hasRisk ? 'Stroke' : 'No Stroke'}
+                          </Tag>
+                        );
+                      }
+                    },
                     { title: 'Rủi ro', key: 'riskScore', align: 'center', width: 150,
                       render: (_, r) => <strong style={{ color: getRiskColorByScore(r.riskScore), fontSize: '16px' }}>{(r.riskScore * 100).toFixed(2)}%</strong> },
                     { title: 'Mức độ', key: 'riskLevel', align: 'center', width: 150,

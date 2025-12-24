@@ -518,10 +518,21 @@ const PredictionPage = () => {
             }
           >
             {(() => {
-              // Tìm kết quả của Decision Tree - model tốt nhất (accuracy 67.5%)
-              const dtResult = result.models?.find(m => m.name === 'Decision Tree');
-              const displayRiskScore = dtResult ? dtResult.riskScore : result.riskScore;
-              const displayRiskLevel = dtResult ? dtResult.riskLevel : result.riskLevel;
+              // Tìm model tốt nhất (được đánh dấu isBestModel từ backend)
+              const bestModelResult = result.models?.find(m => m.isBestModel === true);
+              
+              // Sử dụng adjusted score cho SVM nếu có
+              let displayRiskScore, displayRiskLevel;
+              if (bestModelResult) {
+                displayRiskScore = bestModelResult.adjustedRiskScore !== undefined 
+                  ? bestModelResult.adjustedRiskScore 
+                  : bestModelResult.riskScore;
+                displayRiskLevel = bestModelResult.riskLevel;
+              } else {
+                // Fallback to main result
+                displayRiskScore = result.riskScore;
+                displayRiskLevel = result.riskLevel;
+              }
               
               return (
                 <>
@@ -562,8 +573,12 @@ const PredictionPage = () => {
                   )}
                   
                   <Alert
-                    message="Chẩn đoán từ thuật toán tốt nhất (Decision Tree)"
-                    description={`Kết quả này từ Decision Tree - model có accuracy thực tế cao nhất (67.5% trên 40 test cases). Phát hiện HIGH risk chính xác 92.44%. Decision Tree được chọn làm model chính vì không underprediction như SVM/KNN. Xem bảng dưới để so sánh với các thuật toán khác.`}
+                    message={`Chẩn đoán từ thuật toán tốt nhất${result.bestModel ? ` (${result.bestModel})` : ''}`}
+                    description={
+                      result.bestModel 
+                        ? `Kết quả này từ ${result.bestModel} - model có độ chính xác cao nhất dựa trên training metrics (accuracy, F1-score, ROC-AUC). Hệ thống tự động chọn model tốt nhất để đưa ra kết quả tổng hợp. Xem bảng dưới để so sánh với các thuật toán khác.`
+                        : 'Kết quả được tính toán từ model có độ chính xác cao nhất. Xem bảng dưới để so sánh giữa các thuật toán.'
+                    }
                     type="success"
                     showIcon
                     style={{ marginTop: 16 }}
@@ -590,16 +605,36 @@ const PredictionPage = () => {
                 dataSource={result.models
                   .map((m, idx) => ({ key: idx, ...m }))}
                 expandable={{
-                  expandedRowRender: (record) => (
-                    <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                      <Alert
-                        message="Thông tin thuật toán"
-                        description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
-                        type="info"
-                        showIcon
-                      />
-                    </div>
-                  ),
+                  expandedRowRender: (record) => {
+                    const isSVM = record.name && record.name.includes('SVM');
+                    const displayScore = record.adjustedRiskScore !== undefined ? record.adjustedRiskScore : record.riskScore;
+                    
+                    return (
+                      <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                        <Alert
+                          message="Thông tin thuật toán"
+                          description={
+                            <div>
+                              <p>{record.name} đã dự đoán xác suất đột quỵ là <strong>{(displayScore * 100).toFixed(2)}%</strong> cho bệnh nhân này.</p>
+                              {isSVM && record.calibrationMethod && (
+                                <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', border: '1px solid #ffc107' }}>
+                                  <p style={{ margin: 0, fontWeight: 'bold', color: '#856404' }}>🔧 Chiến lược SVM Re-calibration:</p>
+                                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', color: '#856404' }}>
+                                    <li>Raw probability: {(record.riskScore * 100).toFixed(2)}% (từ dual calibration)</li>
+                                    <li>Adjusted probability: {(record.adjustedRiskScore * 100).toFixed(2)}% (percentile-based mapping)</li>
+                                    <li>Method: {record.calibrationMethod}</li>
+                                    <li>Lý do: SVM bị nén xác suất do imbalanced data (95:5 ratio)</li>
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          }
+                          type="info"
+                          showIcon
+                        />
+                      </div>
+                    );
+                  },
                 }}
                 columns={[
                   { 
@@ -618,15 +653,42 @@ const PredictionPage = () => {
                     }
                   },
                   { 
+                    title: 'Kết quả phân loại', 
+                    dataIndex: 'predictedClass', 
+                    key: 'predictedClass',
+                    align: 'center',
+                    width: 150,
+                    render: (predictedClass) => {
+                      const hasRisk = predictedClass === 1;
+                      return (
+                        <Tag color={hasRisk ? 'red' : 'green'} style={{ fontSize: '14px', padding: '4px 12px' }}>
+                          {hasRisk ? 'Stroke' : 'No Stroke'}
+                        </Tag>
+                      );
+                    }
+                  },
+                  { 
                     title: 'Điểm rủi ro', 
                     key: 'riskScore', 
                     align: 'center',
-                    width: 150,
-                    render: (_, r) => (
-                      <span style={{ fontSize: '18px', fontWeight: 'bold', color: getRiskColorByScore(r.riskScore) }}>
-                        {(r.riskScore * 100).toFixed(2)}%
-                      </span>
-                    )
+                    width: 200,
+                    render: (_, r) => {
+                      const isSVM = r.name && r.name.includes('SVM');
+                      const displayScore = r.adjustedRiskScore !== undefined ? r.adjustedRiskScore : r.riskScore;
+                      
+                      return (
+                        <div>
+                          <span style={{ fontSize: '18px', fontWeight: 'bold', color: getRiskColorByScore(displayScore) }}>
+                            {(displayScore * 100).toFixed(2)}%
+                          </span>
+                          {isSVM && r.adjustedRiskScore !== undefined && (
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                              Raw: {(r.riskScore * 100).toFixed(2)}%
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                   },
                   { 
                     title: 'Mức độ rủi ro', 
@@ -640,17 +702,13 @@ const PredictionPage = () => {
                   },
                   { 
                     title: 'Đánh giá', 
-                    dataIndex: 'name', 
+                    dataIndex: 'isBestModel', 
                     key: 'evaluation',
                     align: 'center',
                     width: 150,
-                    render: (name) => {
-                      // Decision Tree là model tốt nhất dựa trên test thực tế:
-                      // - 60% accuracy trên 40 test cases
-                      // - Phát hiện HIGH risk chính xác 92.44%
-                      // - Không bị calibration issue như SVM
-                      // SVM có ROC-AUC cao nhưng bị underprediction nghiêm trọng (4.18% cho high-risk case)
-                      if (name && name.includes('Decision Tree')) {
+                    render: (isBestModel) => {
+                      // Use backend determination of best model based on training metrics
+                      if (isBestModel) {
                         return <Tag color="green" style={{ fontSize: '13px', padding: '4px 12px' }}>⭐ Tốt nhất</Tag>;
                       }
                       return <Tag color="default" style={{ fontSize: '13px' }}>Tham khảo</Tag>;
