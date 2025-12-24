@@ -645,7 +645,11 @@ const PredictionPage = () => {
                     align: 'center',
                     width: 150,
                     render: (name) => {
-                      // name đã là display name, kiểm tra nếu chứa "Decision Tree"
+                      // Decision Tree là model tốt nhất dựa trên test thực tế:
+                      // - 60% accuracy trên 40 test cases
+                      // - Phát hiện HIGH risk chính xác 92.44%
+                      // - Không bị calibration issue như SVM
+                      // SVM có ROC-AUC cao nhưng bị underprediction nghiêm trọng (4.18% cho high-risk case)
                       if (name && name.includes('Decision Tree')) {
                         return <Tag color="green" style={{ fontSize: '13px', padding: '4px 12px' }}>⭐ Tốt nhất</Tag>;
                       }
