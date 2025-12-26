@@ -177,6 +177,8 @@ const ModelConfigPage = () => {
   };
 
   const startTraining = async () => {
+    let pollInterval = null;
+    
     try {
       setTraining(true);
       setTrainingProgress(0);
@@ -187,7 +189,7 @@ const ModelConfigPage = () => {
       await api.trainModels();
       
       // Poll training status
-      const pollInterval = setInterval(async () => {
+      pollInterval = setInterval(async () => {
         try {
           const status = await api.getTrainingStatus();
           
@@ -199,11 +201,15 @@ const ModelConfigPage = () => {
             
             if (status.error) {
               message.error('Training thất bại: ' + status.error);
+              setTrainingModalVisible(false);
             } else if (status.progress === 100) {
               message.success('Training hoàn tất thành công!');
               setTimeout(() => {
                 setTrainingModalVisible(false);
               }, 2000);
+            } else {
+              // Training stopped but not completed successfully
+              setTrainingModalVisible(false);
             }
             
             setTraining(false);
@@ -212,10 +218,14 @@ const ModelConfigPage = () => {
           clearInterval(pollInterval);
           message.error('Không thể lấy trạng thái training');
           setTraining(false);
+          setTrainingModalVisible(false);
         }
       }, 2000); // Poll every 2 seconds
       
     } catch (error) {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
       message.error('Không thể bắt đầu training: ' + (error.response?.data?.error || error.message));
       setTraining(false);
       setTrainingModalVisible(false);

@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import subprocess
 import threading
 from flask import Blueprint, request, jsonify
@@ -149,8 +150,10 @@ def run_training():
         training_status['progress'] = 30
         training_status['message'] = 'Đang training các thuật toán ML...'
         
+        # Use sys.executable to ensure we use the same Python interpreter
+        # that's running this Flask app (with all dependencies installed)
         result = subprocess.run(
-            ['python', 'train_model.py'],
+            [sys.executable, 'train_model.py'],
             cwd=os.getcwd(),
             capture_output=True,
             text=True,
