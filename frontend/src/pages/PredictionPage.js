@@ -518,21 +518,11 @@ const PredictionPage = () => {
             }
           >
             {(() => {
-              // Tìm model tốt nhất (được đánh dấu isBestModel từ backend)
-              const bestModelResult = result.models?.find(m => m.isBestModel === true);
-              
-              // Sử dụng adjusted score cho SVM nếu có
-              let displayRiskScore, displayRiskLevel;
-              if (bestModelResult) {
-                displayRiskScore = bestModelResult.adjustedRiskScore !== undefined 
-                  ? bestModelResult.adjustedRiskScore 
-                  : bestModelResult.riskScore;
-                displayRiskLevel = bestModelResult.riskLevel;
-              } else {
-                // Fallback to main result
-                displayRiskScore = result.riskScore;
-                displayRiskLevel = result.riskLevel;
-              }
+              // Use adjusted score from main result (already calculated by backend)
+              const displayRiskScore = result.adjustedRiskScore !== undefined 
+                ? result.adjustedRiskScore 
+                : result.riskScore;
+              const displayRiskLevel = result.riskLevel;
               
               return (
                 <>
@@ -551,6 +541,11 @@ const PredictionPage = () => {
                       <span style={{ marginLeft: 12, fontSize: 20, fontWeight: 'bold', color: getRiskColorByScore(displayRiskScore) }}>
                         {(displayRiskScore * 100).toFixed(2)}%
                       </span>
+                      {result.adjustedRiskScore !== undefined && result.adjustedRiskScore !== result.riskScore && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: '#666' }}>
+                          (raw: {(result.riskScore * 100).toFixed(2)}%)
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -564,6 +559,11 @@ const PredictionPage = () => {
                             {result.classificationResult}
                           </strong>
                           {result.predictedClass === 1 ? ' - Khuyến nghị kiểm tra và theo dõi sức khỏe.' : ' - Tiếp tục duy trì lối sống lành mạnh.'}
+                          {result.threshold !== undefined && (
+                            <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#666' }}>
+                              (Threshold: {(result.threshold * 100).toFixed(1)}% - Raw score: {(result.riskScore * 100).toFixed(2)}%)
+                            </span>
+                          )}
                         </span>
                       }
                       type={result.predictedClass === 1 ? 'warning' : 'success'}
@@ -575,9 +575,16 @@ const PredictionPage = () => {
                   <Alert
                     message={`Chẩn đoán từ thuật toán tốt nhất${result.bestModel ? ` (${result.bestModel})` : ''}`}
                     description={
-                      result.bestModel 
-                        ? `Kết quả này từ ${result.bestModel} - model có độ chính xác cao nhất dựa trên training metrics (accuracy, F1-score, ROC-AUC). Hệ thống tự động chọn model tốt nhất để đưa ra kết quả tổng hợp. Xem bảng dưới để so sánh với các thuật toán khác.`
-                        : 'Kết quả được tính toán từ model có độ chính xác cao nhất. Xem bảng dưới để so sánh giữa các thuật toán.'
+                      <>
+                        {result.bestModel 
+                          ? `Kết quả này từ ${result.bestModel} - model có độ chính xác cao nhất dựa trên training metrics (accuracy, F1-score, ROC-AUC). Hệ thống tự động chọn model tốt nhất để đưa ra kết quả tổng hợp. Xem bảng dưới để so sánh với các thuật toán khác.`
+                          : 'Kết quả được tính toán từ model có độ chính xác cao nhất. Xem bảng dưới để so sánh giữa các thuật toán.'}
+                        {result.calibrationMethod && (
+                          <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                            Calibration method: {result.calibrationMethod}
+                          </div>
+                        )}
+                      </>
                     }
                     type="success"
                     showIcon

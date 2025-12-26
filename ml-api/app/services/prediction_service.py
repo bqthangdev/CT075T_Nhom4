@@ -188,6 +188,36 @@ class PredictionService:
         df = pd.DataFrame([row])
         return df
 
+    @staticmethod
+    def _apply_svm_calibration(raw_score: float) -> tuple[float, str]:
+        """
+        Apply percentile-based re-calibration for SVM probability.
+        SVM raw probabilities are typically very low (median ~0.05).
+        Map to [0, 1] scale based on percentile distribution.
+        
+        Returns: (adjusted_score, calibration_method)
+        """
+        # SVM probabilities in training data:
+        # - P50 (median) ≈ 0.05
+        # - P75 ≈ 0.08
+        # - P90 ≈ 0.15
+        # - P95 ≈ 0.25
+        
+        if raw_score < 0.05:  # Below median (P0-P50) → Scale to [0, 0.4]
+            adjusted = raw_score / 0.05 * 0.4
+            method = "Percentile P0-P50"
+        elif raw_score < 0.08:  # P50-P75 → Scale to [0.4, 0.6]
+            adjusted = 0.4 + (raw_score - 0.05) / (0.08 - 0.05) * 0.2
+            method = "Percentile P50-P75"
+        elif raw_score < 0.15:  # P75-P90 → Scale to [0.6, 0.8]
+            adjusted = 0.6 + (raw_score - 0.08) / (0.15 - 0.08) * 0.2
+            method = "Percentile P75-P90"
+        else:  # Above P90 → Scale to [0.8, 1.0]
+            adjusted = 0.8 + min((raw_score - 0.15) / (0.5 - 0.15), 1.0) * 0.2
+            method = "Percentile P90+"
+        
+        return max(0.0, min(adjusted, 1.0)), method
+
     def predict(self, data: Dict[str, Any]) -> Dict[str, Any]:
         # Validate
         errors = validate_input(data)
@@ -201,8 +231,10 @@ class PredictionService:
 
         # UPDATED: Use best performing model based on training metrics
         # Automatically determined from accuracy, F1-score, and ROC-AUC
-        score = None
+        raw_score = None
+        adjusted_score = None
         best_model_key = None
+        calibration_method = None
         
         if model_scores:
             # Get the best model based on training metrics
@@ -210,109 +242,109 @@ class PredictionService:
             
             # Priority: Best Model > Ensemble Average > Fallback to any available
             if best_model_key and best_model_key in model_scores:
-                score = model_scores[best_model_key]
-                print(f"[Prediction] Using best model: {best_model_key} (score: {score:.4f})")
+                raw_score = model_scores[best_model_key]
+                
+                # Apply calibration for SVM to get adjusted score
+                if best_model_key == 'svm':
+                    adjusted_score, calibration_method = self._apply_svm_calibration(raw_score)
+                    print(f"[Prediction] Using best model: {best_model_key} (raw: {raw_score:.4f}, adjusted: {adjusted_score:.4f})")
+                else:
+                    adjusted_score = raw_score
+                    print(f"[Prediction] Using best model: {best_model_key} (score: {raw_score:.4f})")
+                    
             elif len(model_scores) >= 2:
                 # Use ensemble average if best model not available
-                score = sum(model_scores.values()) / len(model_scores)
-                print(f"[Prediction] Using ensemble average (score: {score:.4f})")
+                raw_score = sum(model_scores.values()) / len(model_scores)
+                adjusted_score = raw_score
+                print(f"[Prediction] Using ensemble average (score: {raw_score:.4f})")
             else:
                 # Fallback to first available model
-                score = list(model_scores.values())[0]
+                raw_score = list(model_scores.values())[0]
                 best_model_key = list(model_scores.keys())[0]
-                print(f"[Prediction] Using fallback model: {best_model_key} (score: {score:.4f})")
+                
+                # Apply calibration for SVM
+                if best_model_key == 'svm':
+                    adjusted_score, calibration_method = self._apply_svm_calibration(raw_score)
+                    print(f"[Prediction] Using fallback model: {best_model_key} (raw: {raw_score:.4f}, adjusted: {adjusted_score:.4f})")
+                else:
+                    adjusted_score = raw_score
+                    print(f"[Prediction] Using fallback model: {best_model_key} (score: {raw_score:.4f})")
 
         # Fallback heuristic if no model available
         # Weights based on Feature Importance analysis (Top 5 features)
-        if score is None:
+        if raw_score is None:
             age = float(data.get('age', 0))
             glucose = float(data.get('avgGlucoseLevel', 0))
             bmi = float(data.get('bmi', 0))
             ever_married = str(data.get('ever_married', data.get('everMarried', ''))).lower()
             hypertension = str(data.get('hypertension', '')).lower()
 
-            score = 0.0
+            raw_score = 0.0
             # Top 5 features by importance (total = 82.6%)
-            score += min(age / 120.0, 1.0) * 0.376        # 37.6% - Most important
-            score += min(glucose / 300.0, 1.0) * 0.20     # 20.0% - Second
-            score += min(bmi / 50.0, 1.0) * 0.177         # 17.7% - Third
+            raw_score += min(age / 120.0, 1.0) * 0.376        # 37.6% - Most important
+            raw_score += min(glucose / 300.0, 1.0) * 0.20     # 20.0% - Second
+            raw_score += min(bmi / 50.0, 1.0) * 0.177         # 17.7% - Third
             
             # Ever Married: Yes increases risk slightly (3.9%)
             if ever_married in ['yes', 'true', '1']:
-                score += 0.039  # 3.9%
+                raw_score += 0.039  # 3.9%
             
             # Hypertension (3.4%)
             if hypertension in ['true', '1', 'yes']:
-                score += 0.034  # 3.4%
+                raw_score += 0.034  # 3.4%
             
             # Heart Disease - not in top 5 but still relevant (~2.5%)
             if str(data.get('heart_disease', data.get('heartDisease', ''))).lower() in ['true', '1', 'yes']:
-                score += 0.025  # ~2.5%
+                raw_score += 0.025  # ~2.5%
             
-            score = max(0.0, min(score, 1.0))
+            raw_score = max(0.0, min(raw_score, 1.0))
+            adjusted_score = raw_score
 
+        # Use adjusted score for risk level calculation (consistent display)
+        score = adjusted_score if adjusted_score is not None else raw_score
         risk_level = self._risk_level(score)
         recommendations = self._recommendations(data, score)
         
-        # Determine predicted class (0 or 1) based on probability threshold
-        # Use model-specific thresholds (especially for SVM which needs 0.15 instead of 0.5)
-        predicted_class = 1 if score >= 0.5 else 0
+        # Use model-specific threshold for classification
+        threshold = MODEL_THRESHOLDS.get(best_model_key, 0.5) if best_model_key else 0.5
+        predicted_class = 1 if raw_score >= threshold else 0
         classification_result = 'Có nguy cơ' if predicted_class == 1 else 'Không có nguy cơ'
 
         # Build models array with display names and use optimal thresholds
-        # CHIẾN LƯỢC MỚI CHO SVM: Probability Re-calibration
         models_arr = []
         if model_scores:
             for name, s in model_scores.items():
                 threshold = MODEL_THRESHOLDS.get(name, 0.5)
                 model_predicted_class = 1 if s >= threshold else 0
                 
-                # Strategy for SVM: Adjusted Risk Score (re-calibration)
-                adjusted_score = s
-                calibration_method = None
+                # Apply calibration for SVM
+                model_adjusted_score = s
+                model_calibration_method = None
                 
                 if name == 'svm':
-                    # STRATEGY 1: Percentile-based re-mapping
-                    # SVM probabilities trong training data:
-                    # - P50 (median) ≈ 0.05
-                    # - P75 ≈ 0.08
-                    # - P90 ≈ 0.15
-                    # - P95 ≈ 0.25
-                    # Map sang [0, 1] scale dựa trên percentile distribution
-                    
-                    if s < 0.05:  # Below median (50th percentile) → Scale to [0, 0.4]
-                        adjusted_score = s / 0.05 * 0.4
-                        calibration_method = "Percentile P0-P50"
-                    elif s < 0.08:  # P50-P75 → Scale to [0.4, 0.6]
-                        adjusted_score = 0.4 + (s - 0.05) / (0.08 - 0.05) * 0.2
-                        calibration_method = "Percentile P50-P75"
-                    elif s < 0.15:  # P75-P90 → Scale to [0.6, 0.8]
-                        adjusted_score = 0.6 + (s - 0.08) / (0.15 - 0.08) * 0.2
-                        calibration_method = "Percentile P75-P90"
-                    else:  # Above P90 → Scale to [0.8, 1.0]
-                        adjusted_score = 0.8 + min((s - 0.15) / (0.5 - 0.15), 1.0) * 0.2
-                        calibration_method = "Percentile P90+"
-                    
-                    adjusted_score = max(0.0, min(adjusted_score, 1.0))
+                    model_adjusted_score, model_calibration_method = self._apply_svm_calibration(s)
                 
                 models_arr.append({
                     'name': MODEL_DISPLAY_NAMES.get(name, name),
                     'riskScore': s,  # Original probability
-                    'adjustedRiskScore': adjusted_score,  # Re-calibrated for SVM
-                    'riskLevel': self._risk_level(adjusted_score),  # Use adjusted for level
+                    'adjustedRiskScore': model_adjusted_score,  # Re-calibrated for SVM
+                    'riskLevel': self._risk_level(model_adjusted_score),  # Use adjusted for level
                     'predictedClass': model_predicted_class,
                     'threshold': threshold,
-                    'calibrationMethod': calibration_method,  # Show strategy used
+                    'calibrationMethod': model_calibration_method,  # Show strategy used
                     'isBestModel': (name == best_model_key)  # Mark best model
                 })
 
         record = {
             **data,
-            'strokeRisk': score,
-            'prediction': risk_level,
-            'predictedClass': predicted_class,  # 0 or 1
-            'classificationResult': classification_result,  # 'Có nguy cơ' or 'Không có nguy cơ'
-            'bestModel': MODEL_DISPLAY_NAMES.get(best_model_key, best_model_key) if best_model_key else None,  # Best model name
+            'strokeRisk': raw_score,  # Raw probability from model
+            'adjustedStrokeRisk': adjusted_score,  # Adjusted probability (calibrated for SVM)
+            'prediction': risk_level,  # Based on adjusted score
+            'predictedClass': predicted_class,  # 0 or 1 based on model-specific threshold
+            'classificationResult': classification_result,  # Based on model-specific threshold
+            'threshold': threshold,  # Threshold used for classification
+            'calibrationMethod': calibration_method,  # Calibration method for best model (if SVM)
+            'bestModel': MODEL_DISPLAY_NAMES.get(best_model_key, best_model_key) if best_model_key else None,
             'models': models_arr,  # Save detailed algorithm comparison
             'recommendations': recommendations,  # Save health recommendations
             'createdAt': datetime.utcnow().isoformat() + 'Z'
@@ -330,10 +362,13 @@ class PredictionService:
         self._save_history()
 
         return {
-            'riskScore': score,
-            'riskLevel': risk_level,
-            'predictedClass': predicted_class,
-            'classificationResult': classification_result,
+            'riskScore': raw_score,  # Raw probability
+            'adjustedRiskScore': adjusted_score,  # Adjusted probability (calibrated)
+            'riskLevel': risk_level,  # Based on adjusted score
+            'predictedClass': predicted_class,  # Based on model-specific threshold
+            'classificationResult': classification_result,  # Based on model-specific threshold
+            'threshold': threshold,  # Threshold used
+            'calibrationMethod': calibration_method,  # If SVM was used
             'bestModel': MODEL_DISPLAY_NAMES.get(best_model_key, best_model_key) if best_model_key else None,
             'models': models_arr,
             'recommendations': recommendations

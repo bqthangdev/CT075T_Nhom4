@@ -127,7 +127,10 @@ const HistoryPage = () => {
         record.age,
         record.gender,
         record.prediction,
-        record.strokeRisk ? `${(record.strokeRisk * 100).toFixed(2)}%` : 'N/A',
+        (() => {
+          const displayRisk = record.adjustedStrokeRisk !== undefined ? record.adjustedStrokeRisk : record.strokeRisk;
+          return displayRisk ? `${(displayRisk * 100).toFixed(2)}%` : 'N/A';
+        })(),
         record.hypertension ? 'Có' : 'Không',
         record.heartDisease ? 'Có' : 'Không',
         record.avgGlucoseLevel,
@@ -249,7 +252,7 @@ const HistoryPage = () => {
       };
 
       const predictionResult = {
-        riskScore: record.strokeRisk,
+        riskScore: record.adjustedStrokeRisk !== undefined ? record.adjustedStrokeRisk : record.strokeRisk,
         riskLevel: record.prediction,
         models: record.models || [],
         recommendations: record.recommendations || []
@@ -395,10 +398,12 @@ const HistoryPage = () => {
       key: 'strokeRisk',
       width: 110,
       align: 'center',
-      render: (risk) => {
-        if (!risk) return 'N/A';
-        const percentage = (risk * 100).toFixed(2);
-        return <span style={{ fontWeight: 'bold', color: getRiskColorByScore(risk) }}>{percentage}%</span>;
+      render: (risk, record) => {
+        // Use adjusted score if available (for SVM), otherwise use raw score
+        const displayRisk = record.adjustedStrokeRisk !== undefined ? record.adjustedStrokeRisk : risk;
+        if (!displayRisk) return 'N/A';
+        const percentage = (displayRisk * 100).toFixed(2);
+        return <span style={{ fontWeight: 'bold', color: getRiskColorByScore(displayRisk) }}>{percentage}%</span>;
       },
       responsive: ['md'],
     },
@@ -726,7 +731,19 @@ const HistoryPage = () => {
                 <div>
                   <strong>Mức độ rủi ro:</strong> <Tag color={getRiskColor(selectedRecord.prediction)}>{getRiskLabelVi(selectedRecord.prediction)}</Tag>
                 </div>
-                <div><strong>Điểm rủi ro:</strong> <strong style={{ fontSize: 16, color: '#1890ff' }}>{(selectedRecord.strokeRisk * 100).toFixed(2)}%</strong></div>
+                <div><strong>Điểm rủi ro:</strong> {(() => {
+                  const displayRisk = selectedRecord.adjustedStrokeRisk !== undefined ? selectedRecord.adjustedStrokeRisk : selectedRecord.strokeRisk;
+                  return (
+                    <>
+                      <strong style={{ fontSize: 16, color: getRiskColorByScore(displayRisk) }}>{(displayRisk * 100).toFixed(2)}%</strong>
+                      {selectedRecord.adjustedStrokeRisk !== undefined && selectedRecord.adjustedStrokeRisk !== selectedRecord.strokeRisk && (
+                        <span style={{ marginLeft: 8, fontSize: 13, color: '#666' }}>
+                          (raw: {(selectedRecord.strokeRisk * 100).toFixed(2)}%)
+                        </span>
+                      )}
+                    </>
+                  );
+                })()}</div>
                 {selectedRecord.classificationResult && (
                   <div>
                     <strong>Phân loại:</strong> 
@@ -754,16 +771,31 @@ const HistoryPage = () => {
                   pagination={false}
                   scroll={{ x: 600 }}
                   expandable={{
-                    expandedRowRender: (record) => (
-                      <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                        <Alert
-                          message="Thông tin thuật toán"
-                          description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
-                          type="info"
-                          showIcon
-                        />
-                      </div>
-                    ),
+                    expandedRowRender: (record) => {
+                      const displayScore = record.adjustedRiskScore !== undefined ? record.adjustedRiskScore : record.riskScore;
+                      const isSVM = record.name && record.name.includes('SVM');
+                      return (
+                        <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                          <Alert
+                            message="Thông tin thuật toán"
+                            description={
+                              <div>
+                                <div>{record.name} đã dự đoán xác suất đột quỵ là {(displayScore * 100).toFixed(2)}% cho bệnh nhân này.</div>
+                                {isSVM && record.adjustedRiskScore !== undefined && record.adjustedRiskScore !== record.riskScore && (
+                                  <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                                    <strong>Lưu ý:</strong> SVM raw probability: {(record.riskScore * 100).toFixed(2)}%. 
+                                    Đã được calibrate thành {(record.adjustedRiskScore * 100).toFixed(2)}% để hiển thị chính xác hơn.
+                                    {record.calibrationMethod && ` (${record.calibrationMethod})`}
+                                  </div>
+                                )}
+                              </div>
+                            }
+                            type="info"
+                            showIcon
+                          />
+                        </div>
+                      );
+                    },
                   }}
                   columns={[
                     { title: 'Thuật toán', dataIndex: 'name', key: 'name', width: 200, fixed: 'left', 
@@ -784,7 +816,20 @@ const HistoryPage = () => {
                       }
                     },
                     { title: 'Rủi ro', key: 'riskScore', align: 'center', width: 150,
-                      render: (_, r) => <strong style={{ color: getRiskColorByScore(r.riskScore), fontSize: '16px' }}>{(r.riskScore * 100).toFixed(2)}%</strong> },
+                      render: (_, r) => {
+                        const displayScore = r.adjustedRiskScore !== undefined ? r.adjustedRiskScore : r.riskScore;
+                        const isSVM = r.name && r.name.includes('SVM');
+                        return (
+                          <Tooltip 
+                            title={isSVM && r.adjustedRiskScore !== undefined && r.adjustedRiskScore !== r.riskScore ? 
+                              `Raw: ${(r.riskScore * 100).toFixed(2)}%, Adjusted: ${(r.adjustedRiskScore * 100).toFixed(2)}%` : null}
+                          >
+                            <strong style={{ color: getRiskColorByScore(displayScore), fontSize: '16px' }}>
+                              {(displayScore * 100).toFixed(2)}%
+                            </strong>
+                          </Tooltip>
+                        );
+                      }},
                     { title: 'Mức độ', key: 'riskLevel', align: 'center', width: 150,
                       render: (_, r) => (
                         <Tag color={getRiskColor(r.riskLevel)} style={{ fontSize: '14px', padding: '4px 12px' }}>{getRiskLabelVi(r.riskLevel)}</Tag>
@@ -1007,15 +1052,23 @@ const HistoryPage = () => {
                   <div className="responsive-grid-2">
                     <div>
                       <strong>Mức độ rủi ro:</strong> 
-                      <Tag color={newResult.riskLevel === 'High Risk' ? 'red' : newResult.riskLevel === 'Medium Risk' ? 'orange' : 'green'} style={{ marginLeft: 8, fontSize: 14 }}>
-                        {newResult.riskLevel}
+                      <Tag color={getRiskColor(newResult.riskLevel)} style={{ marginLeft: 8, fontSize: 14 }}>
+                        {getRiskLabelVi(newResult.riskLevel)}
                       </Tag>
                     </div>
                     <div>
                       <strong>Điểm rủi ro:</strong> 
-                      <strong style={{ fontSize: 18, marginLeft: 8, color: '#52c41a' }}>
-                        {(newResult.riskScore * 100).toFixed(2)}%
+                      <strong style={{ fontSize: 18, marginLeft: 8, color: getRiskColorByScore(newResult.adjustedRiskScore !== undefined ? newResult.adjustedRiskScore : newResult.riskScore) }}>
+                        {(() => {
+                          const displayScore = newResult.adjustedRiskScore !== undefined ? newResult.adjustedRiskScore : newResult.riskScore;
+                          return `${(displayScore * 100).toFixed(2)}%`;
+                        })()}
                       </strong>
+                      {newResult.adjustedRiskScore !== undefined && newResult.adjustedRiskScore !== newResult.riskScore && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: '#666' }}>
+                          (raw: {(newResult.riskScore * 100).toFixed(2)}%)
+                        </span>
+                      )}
                     </div>
                   </div>
                   
@@ -1027,6 +1080,12 @@ const HistoryPage = () => {
                           Hệ thống đánh giá: <strong style={{ color: newResult.predictedClass === 1 ? '#ff4d4f' : '#52c41a' }}>
                             {newResult.classificationResult}
                           </strong>
+                          {newResult.predictedClass === 1 ? ' - Khuyến nghị kiểm tra và theo dõi sức khỏe.' : ' - Tiếp tục duy trì lối sống lành mạnh.'}
+                          {newResult.threshold !== undefined && (
+                            <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#666' }}>
+                              (Threshold: {(newResult.threshold * 100).toFixed(1)}% - Raw score: {(newResult.riskScore * 100).toFixed(2)}%)
+                            </span>
+                          )}
                         </span>
                       }
                       type={newResult.predictedClass === 1 ? 'warning' : 'success'}
@@ -1036,8 +1095,19 @@ const HistoryPage = () => {
                   )}
                   
                   <Alert
-                    message="Chẩn đoán từ thuật toán tốt nhất (Decision Tree)"
-                    description="Kết quả này dựa trên Decision Tree - model có accuracy thực tế cao nhất (67.5% trên 40 test cases). Phát hiện HIGH risk chính xác 92.44%. Decision Tree được chọn làm model chính vì không underprediction như SVM/KNN."
+                    message={`Chẩn đoán từ thuật toán tốt nhất${newResult.bestModel ? ` (${newResult.bestModel})` : ''}`}
+                    description={
+                      <>
+                        {newResult.bestModel 
+                          ? `Kết quả này từ ${newResult.bestModel} - model có độ chính xác cao nhất dựa trên training metrics (accuracy, F1-score, ROC-AUC). Hệ thống tự động chọn model tốt nhất để đưa ra kết quả tổng hợp. Xem bảng dưới để so sánh với các thuật toán khác.`
+                          : 'Kết quả được tính toán từ model có độ chính xác cao nhất. Xem bảng dưới để so sánh giữa các thuật toán.'}
+                        {newResult.calibrationMethod && (
+                          <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                            Calibration method: {newResult.calibrationMethod}
+                          </div>
+                        )}
+                      </>
+                    }
                     type="success"
                     showIcon
                     style={{ marginTop: 12, fontSize: 12 }}
@@ -1060,23 +1130,38 @@ const HistoryPage = () => {
                       dataSource={newResult.models
                         .map((m, idx) => ({ key: idx, ...m }))}
                       expandable={{
-                        expandedRowRender: (record) => (
-                          <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                            <Alert
-                              message="Thông tin thuật toán"
-                              description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
-                              type="info"
-                              showIcon
-                            />
-                          </div>
-                        ),
+                        expandedRowRender: (record) => {
+                          const displayScore = record.adjustedRiskScore !== undefined ? record.adjustedRiskScore : record.riskScore;
+                          const isSVM = record.name && record.name.includes('SVM');
+                          return (
+                            <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                              <Alert
+                                message="Thông tin thuật toán"
+                                description={
+                                  <div>
+                                    <div>{record.name} đã dự đoán xác suất đột quỵ là {(displayScore * 100).toFixed(2)}% cho bệnh nhân này.</div>
+                                    {isSVM && record.adjustedRiskScore !== undefined && record.adjustedRiskScore !== record.riskScore && (
+                                      <div style={{ marginTop: 8, fontSize: 12, color: '#666' }}>
+                                        <strong>Lưu ý:</strong> SVM raw probability: {(record.riskScore * 100).toFixed(2)}%. 
+                                        Đã được calibrate thành {(record.adjustedRiskScore * 100).toFixed(2)}% để hiển thị chính xác hơn.
+                                        {record.calibrationMethod && ` (${record.calibrationMethod})`}
+                                      </div>
+                                    )}
+                                  </div>
+                                }
+                                type="info"
+                                showIcon
+                              />
+                            </div>
+                          );
+                        },
                       }}
                       columns={[
                         { 
                           title: 'Thuật toán', 
                           dataIndex: 'name', 
                           key: 'name',
-                          width: 250,
+                          width: 200,
                           fixed: 'left',
                           render: (name) => {
                             // name đã là display name từ backend
@@ -1084,15 +1169,39 @@ const HistoryPage = () => {
                           }
                         },
                         { 
+                          title: 'Kết quả phân loại', 
+                          dataIndex: 'predictedClass', 
+                          key: 'predictedClass',
+                          align: 'center',
+                          width: 150,
+                          render: (predictedClass) => {
+                            const hasRisk = predictedClass === 1;
+                            return (
+                              <Tag color={hasRisk ? 'red' : 'green'} style={{ fontSize: '14px', padding: '4px 12px' }}>
+                                {hasRisk ? 'Stroke' : 'No Stroke'}
+                              </Tag>
+                            );
+                          }
+                        },
+                        { 
                           title: 'Rủi ro', 
                           key: 'riskScore',
                           align: 'center',
                           width: 150,
-                          render: (_, r) => (
-                            <span style={{ fontWeight: 'bold', fontSize: '16px', color: getRiskColorByScore(r.riskScore) }}>
-                              {(r.riskScore * 100).toFixed(1)}%
-                            </span>
-                          )
+                          render: (_, r) => {
+                            const displayScore = r.adjustedRiskScore !== undefined ? r.adjustedRiskScore : r.riskScore;
+                            const isSVM = r.name && r.name.includes('SVM');
+                            return (
+                              <Tooltip 
+                                title={isSVM && r.adjustedRiskScore !== undefined && r.adjustedRiskScore !== r.riskScore ? 
+                                  `Raw: ${(r.riskScore * 100).toFixed(2)}%, Adjusted: ${(r.adjustedRiskScore * 100).toFixed(2)}%` : null}
+                              >
+                                <span style={{ fontWeight: 'bold', fontSize: '16px', color: getRiskColorByScore(displayScore) }}>
+                                  {(displayScore * 100).toFixed(1)}%
+                                </span>
+                              </Tooltip>
+                            );
+                          }
                         },
                         {
                           title: 'Mức độ',
