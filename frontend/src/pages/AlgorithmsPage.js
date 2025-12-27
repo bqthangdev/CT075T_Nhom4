@@ -7,85 +7,74 @@ const { Panel } = Collapse;
 const AlgorithmsPage = () => {
   const algorithms = [
     {
-      key: 'logistic_regression',
-      name: 'Logistic Regression',
-      icon: <CheckCircleOutlined style={{ fontSize: 24, color: '#1890ff' }} />,
-      description: 'Thuật toán hồi quy logistic - một phương pháp thống kê cổ điển cho phân loại nhị phân',
-      advantages: [
-        'Đơn giản, dễ hiểu và giải thích',
-        'Tính toán nhanh, phù hợp với dữ liệu lớn',
-        'Cung cấp xác suất dự đoán rõ ràng',
-        'Ít bị overfitting với dữ liệu đơn giản'
-      ],
-      disadvantages: [
-        'Giả định mối quan hệ tuyến tính',
-        'Khó xử lý các mối quan hệ phức tạp',
-        'Nhạy cảm với outliers'
-      ],
-      useCase: 'Phù hợp cho dữ liệu có mối quan hệ tuyến tính giữa các đặc trưng và kết quả',
-      color: '#1890ff'
-    },
-    {
-      key: 'random_forest',
-      name: 'Random Forest',
-      icon: <TeamOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
-      description: 'Thuật toán rừng ngẫu nhiên - kết hợp nhiều cây quyết định để đưa ra dự đoán chính xác hơn',
-      advantages: [
-        'Độ chính xác cao với nhiều loại dữ liệu',
-        'Xử lý tốt dữ liệu không cân bằng',
-        'Tự động xử lý missing values',
-        'Giảm thiểu overfitting nhờ kỹ thuật ensemble',
-        'Đánh giá được tầm quan trọng của từng đặc trưng'
-      ],
-      disadvantages: [
-        'Tốn nhiều bộ nhớ và thời gian tính toán',
-        'Khó giải thích so với single tree',
-        'Có thể overfitting với dữ liệu nhiễu'
-      ],
-      useCase: 'Rất hiệu quả cho bài toán phức tạp với nhiều đặc trưng và dữ liệu không cân bằng',
-      color: '#52c41a'
-    },
-    // TEMPORARILY DISABLED: Gradient Boosting
-    // {
-    //   key: 'gradient_boosting',
-    //   name: 'Gradient Boosting',
-    //   icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#faad14' }} />,
-    //   description: 'Thuật toán tăng cường gradient - xây dựng mô hình mạnh bằng cách kết hợp nhiều mô hình yếu',
-    //   advantages: [
-    //     'Độ chính xác rất cao',
-    //     'Xử lý tốt các mối quan hệ phi tuyến',
-    //     'Tối ưu hóa trực tiếp hàm loss function',
-    //     'Tự động xử lý missing values',
-    //     'Hiệu quả với dữ liệu có nhiều đặc trưng'
-    //   ],
-    //   disadvantages: [
-    //     'Dễ bị overfitting nếu không tune tham số tốt',
-    //     'Thời gian training lâu',
-    //     'Nhạy cảm với outliers và nhiễu',
-    //     'Khó giải thích và debug'
-    //   ],
-    //   useCase: 'Lựa chọn tốt cho các bài toán cần độ chính xác cao và có đủ dữ liệu để training',
-    //   color: '#faad14'
-    // },
-    {
       key: 'knn',
       name: 'K-Nearest Neighbors (KNN)',
       icon: <ExperimentOutlined style={{ fontSize: 24, color: '#722ed1' }} />,
       description: 'Thuật toán k-láng giềng gần nhất - phân loại dựa trên sự tương đồng với các điểm dữ liệu lân cận',
+      accuracy: '27.5%',
       advantages: [
         'Không cần training, dự đoán trực tiếp',
         'Đơn giản và dễ hiểu',
         'Không có giả định về phân phối dữ liệu',
-        'Hiệu quả với dữ liệu nhỏ và trung bình'
+        'Specificity cao: 100% (không false positive)'
       ],
       disadvantages: [
+        '⚠️ Sensitivity = 0% - KHÔNG phát hiện được TRUE POSITIVE',
+        '⚠️ Underprediction: chỉ 27.5% accuracy thực tế',
+        '⚠️ Dự đoán HIGH risk cases quá thấp (20%)',
         'Chậm khi dự đoán với dữ liệu lớn',
-        'Nhạy cảm với scale của features',
-        'Cần chọn K phù hợp',
-        'Không hiệu quả với dữ liệu nhiều chiều'
+        'Nhạy cảm với scale của features'
       ],
-      useCase: 'Phù hợp với dữ liệu có cấu trúc không gian rõ ràng và kích thước vừa phải',
+      useCase: 'Model hỗ trợ - Specificity cao nhưng không phát hiện được stroke cases (Sensitivity = 0%)',
       color: '#722ed1'
+    },
+    {
+      key: 'svm',
+      name: 'Support Vector Machine (SVM)',
+      icon: <ThunderboltOutlined style={{ fontSize: 24, color: '#fa8c16' }} />,
+      description: 'Máy vector hỗ trợ - tìm siêu phẳng tối ưu để phân tách các lớp dữ liệu với margin lớn nhất',
+      accuracy: '27.5%',
+      advantages: [
+        'ROC-AUC cao nhất: 0.8356',
+        'Hiệu quả cao với dữ liệu nhiều chiều',
+        'Xử lý tốt class imbalance với class_weight',
+        'Robust với outliers nhờ soft margin',
+        'Kernel trick xử lý non-linear relationships'
+      ],
+      disadvantages: [
+        '⚠️ Underprediction nghiêm trọng: chỉ 27.5% accuracy thực tế',
+        '⚠️ Dự đoán HIGH risk cases quá thấp (25.47% thay vì >66%)',
+        'Training chậm với dataset lớn',
+        'Cần feature scaling bắt buộc',
+        'Khó giải thích và visualize'
+      ],
+      useCase: 'Model hỗ trợ - ROC-AUC cao nhưng underprediction trên cases thực tế (27.5% accuracy)',
+      color: '#fa8c16'
+    },
+    {
+      key: 'decision_tree',
+      name: 'Decision Tree',
+      icon: <TeamOutlined style={{ fontSize: 24, color: '#52c41a' }} />,
+      description: 'Cây quyết định - phân loại theo cấu trúc cây với các điều kiện if-else dựa trên features',
+      isBest: true,
+      accuracy: '67.5%',
+      advantages: [
+        '✨ ACCURACY CAO NHẤT: 67.5% trên test cases thực tế',
+        '🎯 Phát hiện HIGH risk chính xác (92.44%)',
+        'Dễ hiểu, visualize và giải thích',
+        'Không cần feature scaling',
+        'Xử lý tốt categorical features',
+        'Training và prediction nhanh',
+        'Không underprediction như SVM/KNN'
+      ],
+      disadvantages: [
+        'MEDIUM prediction chưa tối ưu',
+        'Dễ overfitting nếu không tune',
+        'Không ổn định, nhạy cảm với data thay đổi',
+        'Cần cải thiện thêm để đạt >80% accuracy'
+      ],
+      useCase: '⭐ MODEL CHÍNH của hệ thống - Accuracy cao nhất (67.5%), phát hiện HIGH risk tốt nhất (92.44%), phù hợp cho chẩn đoán y tế',
+      color: '#52c41a'
     }
   ];
 
@@ -100,16 +89,25 @@ const AlgorithmsPage = () => {
         }
       >
         <Alert
-          message="📊 Phương pháp đánh giá đa thuật toán"
-          description="Hệ thống sử dụng 4 thuật toán Machine Learning khác nhau để phân tích cùng một bộ dữ liệu. Mỗi thuật toán có ưu điểm riêng và cung cấp góc nhìn khác nhau về nguy cơ đột quỵ. Kết quả cuối cùng là trung bình của tất cả các thuật toán, giúp tăng độ tin cậy và giảm thiểu sai số."
-          type="info"
+          message="🏆 Decision Tree - Model Chính với Accuracy 67.5%"
+          description={
+            <div>
+              <p style={{ marginBottom: 8 }}>Sau quá trình đánh giá toàn diện trên 40 test cases thực tế, <strong>Decision Tree</strong> được chọn làm model chính với accuracy <strong>67.5%</strong> (cao gấp 2.5 lần so với SVM/KNN).</p>
+              <ul style={{ marginBottom: 0, paddingLeft: 20 }}>
+                <li><strong>Decision Tree (⭐ BEST):</strong> 67.5% accuracy - Phát hiện HIGH risk chính xác 92.44%</li>
+                <li><strong>SVM:</strong> 27.5% accuracy - ROC-AUC cao (0.836) nhưng underprediction nghiêm trọng</li>
+                <li><strong>KNN:</strong> 27.5% accuracy - Sensitivity = 0% (không phát hiện TRUE POSITIVE)</li>
+              </ul>
+            </div>
+          }
+          type="success"
           showIcon
           style={{ marginBottom: 24 }}
         />
 
         <Collapse 
           accordion
-          defaultActiveKey={['logistic_regression']}
+          defaultActiveKey={['knn']}
           style={{ marginTop: 20 }}
         >
           {algorithms.map((algo) => (
@@ -120,6 +118,8 @@ const AlgorithmsPage = () => {
                     {algo.icon}
                     <span style={{ fontSize: 16, fontWeight: 'bold' }}>{algo.name}</span>
                   </div>
+                  {algo.isBest && <Tag color="gold" style={{ fontWeight: 'bold' }}>⭐ BEST MODEL</Tag>}
+                  {algo.accuracy && <Tag color={algo.isBest ? 'green' : 'default'}>Accuracy: {algo.accuracy}</Tag>}
                   <Tag color={algo.color}>{algo.key}</Tag>
                 </div>
               }
@@ -229,12 +229,35 @@ const AlgorithmsPage = () => {
         </Card>
 
         <Alert
+          message="Phương pháp đánh giá models"
+          description={
+            <div>
+              <p><strong>Hệ thống sử dụng 2 phương pháp validation:</strong></p>
+              <ul style={{ paddingLeft: 20, marginBottom: 8 }}>
+                <li><strong>K-Fold Cross Validation (k=5):</strong> Chia dataset thành 5 phần, lần lượt train và test để đánh giá toàn diện. Mỗi sample được test 1 lần.</li>
+                <li><strong>Holdout Validation (70/30):</strong> Chia 70% train, 30% test để training model cuối cùng deploy vào production.</li>
+                <li><strong>Stratified Sampling:</strong> Đảm bảo tỷ lệ stroke/normal giống nhau trong mỗi fold và train/test set.</li>
+              </ul>
+              <p><strong>Xử lý dữ liệu thiếu (Missing Data):</strong></p>
+              <ul style={{ paddingLeft: 20, marginBottom: 8 }}>
+                <li><strong>BMI:</strong> Imputation bằng giá trị cố định 22 (BMI bình thường, 18.5-24.9) - chiến lược bảo thủ không thiên lệch</li>
+                <li><strong>Categorical features:</strong> Imputation bằng Mode (giá trị phổ biến nhất)</li>
+                <li><strong>No Data Leakage:</strong> Sử dụng scikit-learn Pipeline để đảm bảo imputation chỉ học từ training set</li>
+              </ul>
+            </div>
+          }
+          type="info"
+          showIcon
+          style={{ marginTop: 24 }}
+        />
+
+        <Alert
           message="Lưu ý quan trọng"
           description={
             <ul style={{ paddingLeft: 20, marginBottom: 0 }}>
               <li>Kết quả dự đoán chỉ mang tính chất tham khảo</li>
               <li>Không thay thế cho chẩn đoán y khoa chuyên nghiệp</li>
-              <li>Độ chính xác phụ thuộc vào chất lượng và số lượng dữ liệu training</li>
+              <li>Độ chính xác phụ thuộc vào chất lượng và số lượng dữ liệu training (5110 samples)</li>
               <li>Luôn tham khảo ý kiến bác sĩ cho các quyết định về sức khỏe</li>
             </ul>
           }

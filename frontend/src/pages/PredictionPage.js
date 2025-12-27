@@ -43,8 +43,8 @@ const PredictionPage = () => {
       message.warning('⚠️ Bạn đang gửi request khá nhanh. Vui lòng chờ giữa các lần chẩn đoán.');
     }
     
-    // Block after 5 requests in 1 minute
-    if (newCount >= 5) {
+    // Block after 10 requests in 1 minute
+    if (newCount >= 10) {
       setIsBlocked(true);
       const cooldown = 5; // 5 seconds cooldown
       setCooldownSeconds(cooldown);
@@ -79,6 +79,8 @@ const PredictionPage = () => {
     setLoading(true);
     try {
       const response = await api.predictStrokeRisk(payload);
+      console.log('[DEBUG] Prediction response:', response.data);
+      console.log('[DEBUG] Models array:', response.data.models);
       setResult(response.data);
       // Save normalized data for report generation (backend/report expects mg/dL)
       setPatientFormData(payload);
@@ -133,7 +135,7 @@ const PredictionPage = () => {
           style={{ marginBottom: 16 }}
         />
       )}
-      {requestCount >= 3 && !isBlocked && (
+      {requestCount >= 8 && !isBlocked && (
         <Alert
           message="⚠️ Cảnh báo: Đang gửi request quá nhanh"
           description={`Bạn đã gửi ${requestCount} request trong 1 phút. Sau 5 request, bạn sẽ phải chờ 5 giây.`}
@@ -483,8 +485,8 @@ const PredictionPage = () => {
               {isBlocked ? `Chờ ${cooldownSeconds}s...` : 'Chẩn đoán'}
             </Button>
             {requestCount > 0 && !isBlocked && (
-              <div style={{ marginTop: 8, fontSize: 12, textAlign: 'center', color: requestCount >= 3 ? '#ff4d4f' : '#999' }}>
-                Số request trong 1 phút: {requestCount}/5
+              <div style={{ marginTop: 8, fontSize: 12, textAlign: 'center', color: requestCount >= 10 ? '#ff4d4f' : '#999' }}>
+                Số request trong 1 phút: {requestCount}/10
               </div>
             )}
           </Form.Item>
@@ -515,37 +517,89 @@ const PredictionPage = () => {
               </Button>
             }
           >
-            <div className="responsive-grid-2">
-              <div>
-                <strong style={{ fontSize: 16 }}>Mức độ rủi ro:</strong>
-                <Tag 
-                  color={getRiskColor(result.riskLevel)} 
-                  style={{ marginLeft: 12, fontSize: 16, padding: '4px 16px' }}
-                >
-                  {getRiskLabelVi(result.riskLevel)}
-                </Tag>
-              </div>
-              <div>
-                <strong style={{ fontSize: 16 }}>Điểm rủi ro:</strong>
-                <span style={{ marginLeft: 12, fontSize: 20, fontWeight: 'bold', color: getRiskColorByScore(result.riskScore) }}>
-                  {(result.riskScore * 100).toFixed(2)}%
-                </span>
-              </div>
-            </div>
-            <Alert
-              message="Chẩn đoán từ thuật toán đáng tin cậy nhất"
-              description="Kết quả này dựa trên Logistic Regression - thuật toán được cân chỉnh tốt nhất cho dữ liệu y tế với class_weight='balanced', giúp phát hiện chính xác các ca rủi ro cao."
-              type="success"
-              showIcon
-              style={{ marginTop: 16 }}
-            />
+            {(() => {
+              // Use adjusted score from main result (already calculated by backend)
+              const displayRiskScore = result.adjustedRiskScore !== undefined 
+                ? result.adjustedRiskScore 
+                : result.riskScore;
+              const displayRiskLevel = result.riskLevel;
+              
+              return (
+                <>
+                  <div className="responsive-grid-2">
+                    <div>
+                      <strong style={{ fontSize: 16 }}>Mức độ rủi ro:</strong>
+                      <Tag 
+                        color={getRiskColor(displayRiskLevel)} 
+                        style={{ marginLeft: 12, fontSize: 16, padding: '4px 16px' }}
+                      >
+                        {getRiskLabelVi(displayRiskLevel)}
+                      </Tag>
+                    </div>
+                    <div>
+                      <strong style={{ fontSize: 16 }}>Điểm rủi ro:</strong>
+                      <span style={{ marginLeft: 12, fontSize: 20, fontWeight: 'bold', color: getRiskColorByScore(displayRiskScore) }}>
+                        {(displayRiskScore * 100).toFixed(2)}%
+                      </span>
+                      {result.adjustedRiskScore !== undefined && result.adjustedRiskScore !== result.riskScore && (
+                        <span style={{ marginLeft: 8, fontSize: 12, color: '#666' }}>
+                          (raw: {(result.riskScore * 100).toFixed(2)}%)
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  {/* Classification Result */}
+                  {result.classificationResult && (
+                    <Alert
+                      message="Kết quả phân loại (Classification)"
+                      description={
+                        <span>
+                          Hệ thống đánh giá: <strong style={{ fontSize: 16, color: result.predictedClass === 1 ? '#ff4d4f' : '#52c41a' }}>
+                            {result.classificationResult}
+                          </strong>
+                          {result.predictedClass === 1 ? ' - Khuyến nghị kiểm tra và theo dõi sức khỏe.' : ' - Tiếp tục duy trì lối sống lành mạnh.'}
+                          {result.threshold !== undefined && (
+                            <span style={{ display: 'block', marginTop: 4, fontSize: 13, color: '#666' }}>
+                              (Threshold: {(result.threshold * 100).toFixed(1)}% - Raw score: {(result.riskScore * 100).toFixed(2)}%)
+                            </span>
+                          )}
+                        </span>
+                      }
+                      type={result.predictedClass === 1 ? 'warning' : 'success'}
+                      showIcon
+                      style={{ marginBottom: 16, marginTop: 16 }}
+                    />
+                  )}
+                  
+                  <Alert
+                    message={`Chẩn đoán từ thuật toán tốt nhất${result.bestModel ? ` (${result.bestModel})` : ''}`}
+                    description={
+                      <>
+                        {result.bestModel 
+                          ? `Kết quả này từ ${result.bestModel} - model có độ chính xác cao nhất dựa trên training metrics (accuracy, F1-score, ROC-AUC). Hệ thống tự động chọn model tốt nhất để đưa ra kết quả tổng hợp. Xem bảng dưới để so sánh với các thuật toán khác.`
+                          : 'Kết quả được tính toán từ model có độ chính xác cao nhất. Xem bảng dưới để so sánh giữa các thuật toán.'}
+                        {result.calibrationMethod && (
+                          <div style={{ marginTop: 8, fontSize: 13, color: '#666' }}>
+                            Calibration method: {result.calibrationMethod}
+                          </div>
+                        )}
+                      </>
+                    }
+                    type="success"
+                    showIcon
+                    style={{ marginTop: 16 }}
+                  />
+                </>
+              );
+            })()}
           </Card>
 
           {Array.isArray(result.models) && result.models.length > 0 && (
             <Card title="📈 So sánh chi tiết các thuật toán Machine Learning" style={{ marginTop: 20 }}>
               <Alert
                 message={`So sánh ${result.models.length} thuật toán khác nhau`}
-                description="Các thuật toán Machine Learning có chiến lược dự đoán khác nhau. Dữ liệu này giúp bạn tham khảo và so sánh kết quả giữa các model. Logistic Regression thường đáng tin cậy nhất cho dữ liệu y tế."
+                description="Các thuật toán Machine Learning có chiến lược dự đoán khác nhau. Dữ liệu này giúp bạn tham khảo và so sánh kết quả giữa các model. SVM thường đáng tin cậy nhất cho dữ liệu y tế imbalanced."
                 type="info"
                 showIcon
                 style={{ marginBottom: 16 }}
@@ -556,40 +610,67 @@ const PredictionPage = () => {
                 scroll={{ x: 600 }}
                 size="small"
                 dataSource={result.models
-                  .filter(m => m.name !== 'gradient_boosting')  // TEMPORARILY DISABLED: Gradient Boosting
                   .map((m, idx) => ({ key: idx, ...m }))}
                 expandable={{
-                  expandedRowRender: (record) => (
-                    <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
-                      <Alert
-                        message="Thông tin thuật toán"
-                        description={`${record.name} đã dự đoán xác suất đột quỵ là ${(record.riskScore * 100).toFixed(2)}% cho bệnh nhân này.`}
-                        type="info"
-                        showIcon
-                      />
-                    </div>
-                  ),
+                  expandedRowRender: (record) => {
+                    const isSVM = record.name && record.name.includes('SVM');
+                    const displayScore = record.adjustedRiskScore !== undefined ? record.adjustedRiskScore : record.riskScore;
+                    
+                    return (
+                      <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+                        <Alert
+                          message="Thông tin thuật toán"
+                          description={
+                            <div>
+                              <p>{record.name} đã dự đoán xác suất đột quỵ là <strong>{(displayScore * 100).toFixed(2)}%</strong> cho bệnh nhân này.</p>
+                              {isSVM && record.calibrationMethod && (
+                                <div style={{ marginTop: '12px', padding: '8px', backgroundColor: '#fff3cd', borderRadius: '4px', border: '1px solid #ffc107' }}>
+                                  <p style={{ margin: 0, fontWeight: 'bold', color: '#856404' }}>🔧 Chiến lược SVM Re-calibration:</p>
+                                  <ul style={{ margin: '8px 0 0 0', paddingLeft: '20px', color: '#856404' }}>
+                                    <li>Raw probability: {(record.riskScore * 100).toFixed(2)}% (từ dual calibration)</li>
+                                    <li>Adjusted probability: {(record.adjustedRiskScore * 100).toFixed(2)}% (percentile-based mapping)</li>
+                                    <li>Method: {record.calibrationMethod}</li>
+                                    <li>Lý do: SVM bị nén xác suất do imbalanced data (95:5 ratio)</li>
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          }
+                          type="info"
+                          showIcon
+                        />
+                      </div>
+                    );
+                  },
                 }}
                 columns={[
                   { 
                     title: 'Thuật toán', 
                     dataIndex: 'name', 
                     key: 'name',
-                    width: 200,
+                    width: 250,
                     fixed: 'left',
                     render: (name) => {
-                      const nameMap = {
-                        'logistic_regression': 'Logistic Regression',
-                        'random_forest': 'Random Forest',
-                        'gradient_boosting': 'Gradient Boosting',
-                        'knn': 'K-Nearest Neighbors'
-                      };
+                      // name đã là display name từ backend (ví dụ: "Support Vector Machine (SVM)")
                       return (
                         <div>
-                          <strong>{nameMap[name] || name}</strong>
-                          <br />
-                          <Tag color="blue" style={{ fontSize: '11px', marginTop: 4 }}>{name}</Tag>
+                          <strong>{name}</strong>
                         </div>
+                      );
+                    }
+                  },
+                  { 
+                    title: 'Kết quả phân loại', 
+                    dataIndex: 'predictedClass', 
+                    key: 'predictedClass',
+                    align: 'center',
+                    width: 150,
+                    render: (predictedClass) => {
+                      const hasRisk = predictedClass === 1;
+                      return (
+                        <Tag color={hasRisk ? 'red' : 'green'} style={{ fontSize: '14px', padding: '4px 12px' }}>
+                          {hasRisk ? 'Stroke' : 'No Stroke'}
+                        </Tag>
                       );
                     }
                   },
@@ -597,12 +678,24 @@ const PredictionPage = () => {
                     title: 'Điểm rủi ro', 
                     key: 'riskScore', 
                     align: 'center',
-                    width: 150,
-                    render: (_, r) => (
-                      <span style={{ fontSize: '18px', fontWeight: 'bold', color: getRiskColorByScore(r.riskScore) }}>
-                        {(r.riskScore * 100).toFixed(2)}%
-                      </span>
-                    )
+                    width: 200,
+                    render: (_, r) => {
+                      const isSVM = r.name && r.name.includes('SVM');
+                      const displayScore = r.adjustedRiskScore !== undefined ? r.adjustedRiskScore : r.riskScore;
+                      
+                      return (
+                        <div>
+                          <span style={{ fontSize: '18px', fontWeight: 'bold', color: getRiskColorByScore(displayScore) }}>
+                            {(displayScore * 100).toFixed(2)}%
+                          </span>
+                          {isSVM && r.adjustedRiskScore !== undefined && (
+                            <div style={{ fontSize: '11px', color: '#999', marginTop: '4px' }}>
+                              Raw: {(r.riskScore * 100).toFixed(2)}%
+                            </div>
+                          )}
+                        </div>
+                      );
+                    }
                   },
                   { 
                     title: 'Mức độ rủi ro', 
@@ -612,6 +705,20 @@ const PredictionPage = () => {
                     width: 150,
                     render: (lvl) => {
                       return <Tag color={getRiskColor(lvl)} style={{ fontSize: '14px', padding: '4px 12px' }}>{getRiskLabelVi(lvl)}</Tag>;
+                    }
+                  },
+                  { 
+                    title: 'Đánh giá', 
+                    dataIndex: 'isBestModel', 
+                    key: 'evaluation',
+                    align: 'center',
+                    width: 150,
+                    render: (isBestModel) => {
+                      // Use backend determination of best model based on training metrics
+                      if (isBestModel) {
+                        return <Tag color="green" style={{ fontSize: '13px', padding: '4px 12px' }}>⭐ Tốt nhất</Tag>;
+                      }
+                      return <Tag color="default" style={{ fontSize: '13px' }}>Tham khảo</Tag>;
                     }
                   },
                 ]}

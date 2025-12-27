@@ -17,10 +17,9 @@ const ModelConfigPage = () => {
   const [trainingModalVisible, setTrainingModalVisible] = useState(false);
   const [configChanged, setConfigChanged] = useState(false); // Track if config has been modified
 
-  const [lrForm] = Form.useForm();
-  const [rfForm] = Form.useForm();
-  const [gbForm] = Form.useForm();
   const [knnForm] = Form.useForm();
+  const [svmForm] = Form.useForm();
+  const [dtForm] = Form.useForm();
 
   useEffect(() => {
     fetchConfig();
@@ -34,19 +33,15 @@ const ModelConfigPage = () => {
       setSavedConfig(JSON.parse(JSON.stringify(response))); // Deep copy for comparison
       setConfigChanged(false); // Reset change flag
       
-      // Set form values
-      if (response.logistic_regression) {
-        lrForm.setFieldsValue(response.logistic_regression);
-      }
-      if (response.random_forest) {
-        rfForm.setFieldsValue(response.random_forest);
-      }
-      // TEMPORARILY DISABLED: Gradient Boosting
-      // if (response.gradient_boosting) {
-      //   gbForm.setFieldsValue(response.gradient_boosting);
-      // }
+      // Set form values for active algorithms
       if (response.knn) {
         knnForm.setFieldsValue(response.knn);
+      }
+      if (response.svm) {
+        svmForm.setFieldsValue(response.svm);
+      }
+      if (response.decision_tree) {
+        dtForm.setFieldsValue(response.decision_tree);
       }
       
       message.success('Tải cấu hình thành công!');
@@ -60,16 +55,14 @@ const ModelConfigPage = () => {
 
   const handleSave = async () => {
     try {
-      const lrValues = await lrForm.validateFields();
-      const rfValues = await rfForm.validateFields();
-      // const gbValues = await gbForm.validateFields();  // TEMPORARILY DISABLED
       const knnValues = await knnForm.validateFields();
+      const svmValues = await svmForm.validateFields();
+      const dtValues = await dtForm.validateFields();
 
       const newConfig = {
-        logistic_regression: lrValues,
-        random_forest: rfValues,
-        // gradient_boosting: gbValues,  // TEMPORARILY DISABLED
         knn: knnValues,
+        svm: svmValues,
+        decision_tree: dtValues,
       };
 
       setSaving(true);
@@ -109,16 +102,14 @@ const ModelConfigPage = () => {
     if (!savedConfig) return true; // If no saved config, allow training
 
     try {
-      const currentLR = lrForm.getFieldsValue();
-      const currentRF = rfForm.getFieldsValue();
-      // const currentGB = gbForm.getFieldsValue();  // TEMPORARILY DISABLED
       const currentKNN = knnForm.getFieldsValue();
+      const currentSVM = svmForm.getFieldsValue();
+      const currentDT = dtForm.getFieldsValue();
 
       const currentConfig = {
-        logistic_regression: currentLR,
-        random_forest: currentRF,
-        // gradient_boosting: currentGB,  // TEMPORARILY DISABLED
         knn: currentKNN,
+        svm: currentSVM,
+        decision_tree: currentDT,
       };
 
       // Deep comparison
@@ -186,6 +177,8 @@ const ModelConfigPage = () => {
   };
 
   const startTraining = async () => {
+    let pollInterval = null;
+    
     try {
       setTraining(true);
       setTrainingProgress(0);
@@ -196,7 +189,7 @@ const ModelConfigPage = () => {
       await api.trainModels();
       
       // Poll training status
-      const pollInterval = setInterval(async () => {
+      pollInterval = setInterval(async () => {
         try {
           const status = await api.getTrainingStatus();
           
@@ -208,11 +201,15 @@ const ModelConfigPage = () => {
             
             if (status.error) {
               message.error('Training thất bại: ' + status.error);
+              setTrainingModalVisible(false);
             } else if (status.progress === 100) {
               message.success('Training hoàn tất thành công!');
               setTimeout(() => {
                 setTrainingModalVisible(false);
               }, 2000);
+            } else {
+              // Training stopped but not completed successfully
+              setTrainingModalVisible(false);
             }
             
             setTraining(false);
@@ -221,10 +218,14 @@ const ModelConfigPage = () => {
           clearInterval(pollInterval);
           message.error('Không thể lấy trạng thái training');
           setTraining(false);
+          setTrainingModalVisible(false);
         }
       }, 2000); // Poll every 2 seconds
       
     } catch (error) {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
       message.error('Không thể bắt đầu training: ' + (error.response?.data?.error || error.message));
       setTraining(false);
       setTrainingModalVisible(false);
@@ -314,205 +315,8 @@ const ModelConfigPage = () => {
           </Button>
         </div>
 
-        <Collapse accordion defaultActiveKey={['lr']}>
-          {/* Logistic Regression */}
-          <Panel header={<strong style={{ fontSize: 16 }}>🔵 Logistic Regression</strong>} key="lr">
-            <Form form={lrForm} layout="vertical">
-              <div className="responsive-grid-3">
-                <Form.Item 
-                  label="Max Iterations" 
-                  name="max_iter" 
-                  tooltip="Số lần lặp tối đa"
-                  rules={[{ required: true }]}
-                >
-                  <InputNumber min={100} max={10000} step={100} style={{ width: '100%' }} />
-                </Form.Item>
-
-                <Form.Item 
-                  label="Solver" 
-                  name="solver"
-                  tooltip="Thuật toán tối ưu hóa"
-                  rules={[{ required: true }]}
-                >
-                  <Select>
-                    <Option value="liblinear">liblinear (small datasets)</Option>
-                    <Option value="lbfgs">lbfgs (default)</Option>
-                    <Option value="saga">saga (large datasets)</Option>
-                    <Option value="sag">sag</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item 
-                  label="C (Regularization)" 
-                  name="C"
-                  tooltip="Inverse of regularization strength. Smaller = stronger regularization"
-                  rules={[{ required: true }]}
-                >
-                  <InputNumber min={0.001} max={100} step={0.1} style={{ width: '100%' }} />
-                </Form.Item>
-
-                <Form.Item 
-                  label="Penalty" 
-                  name="penalty"
-                  tooltip="Loại regularization"
-                  rules={[{ required: true }]}
-                >
-                  <Select>
-                    <Option value="l1">L1 (Lasso)</Option>
-                    <Option value="l2">L2 (Ridge)</Option>
-                    <Option value="elasticnet">ElasticNet</Option>
-                    <Option value="none">None</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Class Weight" name="class_weight">
-                  <Select>
-                    <Option value="balanced">Balanced (auto)</Option>
-                    <Option value={null}>None</Option>
-                  </Select>
-                </Form.Item>
-
-                <Form.Item label="Random State" name="random_state">
-                  <InputNumber min={0} max={1000} style={{ width: '100%' }} />
-                </Form.Item>
-              </div>
-            </Form>
-          </Panel>
-
-          {/* Random Forest */}
-          <Panel header={<strong style={{ fontSize: 16 }}>🟢 Random Forest</strong>} key="rf">
-            <Form form={rfForm} layout="vertical">
-              <div className="responsive-grid-3">
-                <Form.Item 
-                  label="N Estimators" 
-                  name="n_estimators"
-                  tooltip="Số lượng cây quyết định"
-                  rules={[{ required: true }]}
-              >
-                <InputNumber min={10} max={1000} step={10} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Max Depth" 
-                name="max_depth"
-                tooltip="Độ sâu tối đa của cây (null = không giới hạn)"
-              >
-                <InputNumber min={1} max={100} style={{ width: '100%' }} placeholder="null" />
-              </Form.Item>
-
-              <Form.Item 
-                label="Min Samples Split" 
-                name="min_samples_split"
-                tooltip="Số mẫu tối thiểu để chia node"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={2} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Min Samples Leaf" 
-                name="min_samples_leaf"
-                tooltip="Số mẫu tối thiểu tại leaf node"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={1} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Max Features" 
-                name="max_features"
-                tooltip="Số lượng features xem xét khi split"
-                rules={[{ required: true }]}
-              >
-                <Select>
-                  <Option value="sqrt">sqrt (recommended)</Option>
-                  <Option value="log2">log2</Option>
-                  <Option value={null}>None (all features)</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item label="Class Weight" name="class_weight">
-                <Select>
-                  <Option value="balanced">Balanced</Option>
-                  <Option value="balanced_subsample">Balanced Subsample</Option>
-                  <Option value={null}>None</Option>
-                </Select>
-              </Form.Item>
-
-              <Form.Item label="Random State" name="random_state">
-                <InputNumber min={0} max={1000} style={{ width: '100%' }} />
-              </Form.Item>
-              </div>
-            </Form>
-          </Panel>
-
-          {/* TEMPORARILY DISABLED: Gradient Boosting */}
-          {/* <Panel header={<strong style={{ fontSize: 16 }}>🟡 Gradient Boosting</strong>} key="gb">
-            <Form form={gbForm} layout="vertical">
-              <div className="responsive-grid-3">
-                <Form.Item 
-                  label="N Estimators" 
-                  name="n_estimators"
-                tooltip="Số lượng boosting stages"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={10} max={1000} step={10} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Learning Rate" 
-                name="learning_rate"
-                tooltip="Shrinks contribution của mỗi tree"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={0.001} max={1} step={0.01} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Max Depth" 
-                name="max_depth"
-                tooltip="Độ sâu tối đa của individual estimators"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={1} max={20} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Min Samples Split" 
-                name="min_samples_split"
-                tooltip="Số mẫu tối thiểu để chia internal node"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={2} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Min Samples Leaf" 
-                name="min_samples_leaf"
-                tooltip="Số mẫu tối thiểu tại leaf node"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={1} max={100} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item 
-                label="Subsample" 
-                name="subsample"
-                tooltip="Tỷ lệ mẫu sử dụng cho mỗi tree"
-                rules={[{ required: true }]}
-              >
-                <InputNumber min={0.1} max={1} step={0.1} style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item label="Random State" name="random_state">
-                <InputNumber min={0} max={1000} style={{ width: '100%' }} />
-              </Form.Item>
-              </div>
-            </Form>
-          </Panel> */}
-
-          {/* KNN */}
-          <Panel header={<strong style={{ fontSize: 16 }}>🟣 K-Nearest Neighbors (KNN)</strong>} key="knn">
+        <Collapse accordion defaultActiveKey={['knn']}>
+          <Panel header={<strong>K-Nearest Neighbors (KNN)</strong>} key="knn">
             <Form form={knnForm} layout="vertical">
               <div className="responsive-grid-3">
                 <Form.Item 
@@ -581,6 +385,116 @@ const ModelConfigPage = () => {
                   <Option value="chebyshev">Chebyshev</Option>
                 </Select>
               </Form.Item>
+              </div>
+            </Form>
+          </Panel>
+
+          <Panel header={<strong>Support Vector Machine (SVM)</strong>} key="svm">
+            <Form form={svmForm} layout="vertical">
+              <div className="responsive-grid-3">
+                <Form.Item 
+                  label="C (Regularization)" 
+                  name="C"
+                  tooltip="Regularization parameter (giá trị nhỏ hơn = regularization mạnh hơn)"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={0.01} max={100} step={0.1} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item 
+                  label="Kernel" 
+                  name="kernel"
+                  tooltip="Kernel type (rbf = Radial Basis Function)"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="rbf">RBF (Gaussian)</Option>
+                    <Option value="linear">Linear</Option>
+                    <Option value="poly">Polynomial</Option>
+                    <Option value="sigmoid">Sigmoid</Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item 
+                  label="Gamma" 
+                  name="gamma"
+                  tooltip="Kernel coefficient (scale = 1 / (n_features * X.var()))"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="scale">Scale (recommended)</Option>
+                    <Option value="auto">Auto</Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item 
+                  label="Class Weight" 
+                  name="class_weight"
+                  tooltip="Trọng số cho các lớp (balanced cho dữ liệu mất cân bằng)"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="balanced">Balanced (recommended for imbalanced data)</Option>
+                    <Option value={null}>None</Option>
+                  </Select>
+                </Form.Item>
+              </div>
+            </Form>
+          </Panel>
+
+          <Panel header={<strong>Decision Tree</strong>} key="decision_tree">
+            <Form form={dtForm} layout="vertical">
+              <div className="responsive-grid-3">
+                <Form.Item 
+                  label="Max Depth" 
+                  name="max_depth"
+                  tooltip="Độ sâu tối đa của cây (giá trị nhỏ = regularization mạnh hơn)"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={1} max={50} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item 
+                  label="Min Samples Split" 
+                  name="min_samples_split"
+                  tooltip="Số mẫu tối thiểu để split một node"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={2} max={100} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item 
+                  label="Min Samples Leaf" 
+                  name="min_samples_leaf"
+                  tooltip="Số mẫu tối thiểu tại mỗi leaf node"
+                  rules={[{ required: true }]}
+                >
+                  <InputNumber min={1} max={100} style={{ width: '100%' }} />
+                </Form.Item>
+
+                <Form.Item 
+                  label="Criterion" 
+                  name="criterion"
+                  tooltip="Hàm đo chất lượng split"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="gini">Gini Impurity</Option>
+                    <Option value="entropy">Entropy (Information Gain)</Option>
+                  </Select>
+                </Form.Item>
+
+                <Form.Item 
+                  label="Class Weight" 
+                  name="class_weight"
+                  tooltip="Trọng số cho các lớp (balanced cho dữ liệu mất cân bằng)"
+                  rules={[{ required: true }]}
+                >
+                  <Select>
+                    <Option value="balanced">Balanced (recommended for imbalanced data)</Option>
+                    <Option value={null}>None</Option>
+                  </Select>
+                </Form.Item>
               </div>
             </Form>
           </Panel>

@@ -1,5 +1,6 @@
 import json
 import os
+import sys
 import subprocess
 import threading
 from flask import Blueprint, request, jsonify
@@ -54,10 +55,11 @@ def update_config():
 
 @config_bp.route('/config/reset', methods=['POST'])
 def reset_config():
-    """Reset configuration to defaults"""
+    """Reset configuration to defaults (KNN, SVM, Decision Tree active)"""
     try:
         default_config = {
-            "logistic_regression": {
+            "_comment": "Active algorithms: KNN, SVM, Decision Tree",
+            "_disabled_logistic_regression": {
                 "max_iter": 1000,
                 "solver": "liblinear",
                 "class_weight": "balanced",
@@ -65,7 +67,7 @@ def reset_config():
                 "penalty": "l2",
                 "random_state": 42
             },
-            "random_forest": {
+            "_disabled_random_forest": {
                 "n_estimators": 300,
                 "max_depth": None,
                 "min_samples_split": 2,
@@ -74,7 +76,7 @@ def reset_config():
                 "class_weight": "balanced",
                 "random_state": 42
             },
-            "gradient_boosting": {
+            "_disabled_gradient_boosting": {
                 "n_estimators": 100,
                 "learning_rate": 0.1,
                 "max_depth": 3,
@@ -90,6 +92,23 @@ def reset_config():
                 "leaf_size": 30,
                 "p": 2,
                 "metric": "minkowski"
+            },
+            "svm": {
+                "C": 1.0,
+                "kernel": "rbf",
+                "gamma": "scale",
+                "class_weight": "balanced",
+                "random_state": 42,
+                "probability": True
+            },
+            "decision_tree": {
+                "max_depth": 8,
+                "min_samples_split": 15,
+                "min_samples_leaf": 7,
+                "criterion": "gini",
+                "class_weight": "balanced",
+                "max_features": None,
+                "random_state": 42
             }
         }
         
@@ -131,8 +150,10 @@ def run_training():
         training_status['progress'] = 30
         training_status['message'] = 'Đang training các thuật toán ML...'
         
+        # Use sys.executable to ensure we use the same Python interpreter
+        # that's running this Flask app (with all dependencies installed)
         result = subprocess.run(
-            ['python', 'train_model.py'],
+            [sys.executable, 'train_model.py'],
             cwd=os.getcwd(),
             capture_output=True,
             text=True,

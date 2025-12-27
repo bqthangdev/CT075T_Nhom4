@@ -1,78 +1,81 @@
 {
-  "logistic_regression": {
-    "roc_auc": 0.8431531196943972,
-    "accuracy": 0.7316118935837246,
-    "f1_score": 0.2222222222222222,
-    "precision": 0.12928759894459102,
-    "recall": 0.7903225806451613,
-    "mae": 0.2683881064162754,
-    "mse": 0.2683881064162754,
-    "mae_proba": 0.30774969228235416,
-    "mse_proba": 0.17402352039700578,
-    "confusion_matrix": {
-      "true_negative": 886,
-      "false_positive": 330,
-      "false_negative": 13,
-      "true_positive": 49
-    },
-    "specificity": 0.7286184210526315,
-    "sensitivity": 0.7903225806451613
-  },
-  "random_forest": {
-    "roc_auc": 0.7824570246179967,
-    "accuracy": 0.9491392801251957,
-    "f1_score": 0.0,
-    "precision": 0.0,
-    "recall": 0.0,
-    "mae": 0.05086071987480438,
-    "mse": 0.05086071987480438,
-    "mae_proba": 0.08599374021909234,
-    "mse_proba": 0.04602015301686663,
-    "confusion_matrix": {
-      "true_negative": 1213,
-      "false_positive": 3,
-      "false_negative": 62,
-      "true_positive": 0
-    },
-    "specificity": 0.9975328947368421,
-    "sensitivity": 0.0
-  },
-  "gradient_boosting": {
-    "roc_auc": 0.8200604838709679,
-    "accuracy": 0.9499217527386542,
-    "f1_score": 0.030303030303030304,
-    "precision": 0.25,
-    "recall": 0.016129032258064516,
-    "mae": 0.050078247261345854,
-    "mse": 0.050078247261345854,
-    "mae_proba": 0.08115014889980512,
-    "mse_proba": 0.04272067314016656,
-    "confusion_matrix": {
-      "true_negative": 1213,
-      "false_positive": 3,
-      "false_negative": 61,
-      "true_positive": 1
-    },
-    "specificity": 0.9975328947368421,
-    "sensitivity": 0.016129032258064516
-  },
   "knn": {
-    "roc_auc": 0.7656780560271648,
-    "accuracy": 0.9514866979655712,
+    "roc_auc": 0.7651074531321446,
+    "accuracy": 0.9510763209393346,
     "f1_score": 0.0,
     "precision": 0.0,
     "recall": 0.0,
-    "mae": 0.048513302034428794,
-    "mse": 0.048513302034428794,
-    "mae_proba": 0.08320292123109024,
-    "mse_proba": 0.04431577117023127,
+    "mae": 0.04892367906066536,
+    "mse": 0.04892367906066536,
+    "rmse": 0.2211869776019044,
+    "mae_proba": 0.08362687540769732,
+    "mse_proba": 0.04444734362542582,
     "confusion_matrix": {
-      "true_negative": 1216,
+      "true_negative": 1458,
       "false_positive": 0,
-      "false_negative": 62,
+      "false_negative": 75,
       "true_positive": 0
     },
     "specificity": 1.0,
-    "sensitivity": 0.0
+    "sensitivity": 0.0,
+    "kfold_metrics": {
+      "accuracy": 0.950880626223092,
+      "precision": 0.0,
+      "recall": 0.0,
+      "f1_score": 0.0,
+      "roc_auc": 0.755422181334945,
+      "specificity": 0.9995885620242748,
+      "sensitivity": 0.0
+    }
+  },
+  "svm": {
+    "roc_auc": 0.8176268861454046,
+    "accuracy": 0.9510763209393346,
+    "f1_score": 0.0,
+    "precision": 0.0,
+    "recall": 0.0,
+    "mae": 0.04892367906066536,
+    "mse": 0.04892367906066536,
+    "rmse": 0.2211869776019044,
+    "mae_proba": 0.08626030559395358,
+    "mse_proba": 0.04289236356320875,
+    "confusion_matrix": {
+      "true_negative": 1458,
+      "false_positive": 0,
+      "false_negative": 75,
+      "true_positive": 0
+    },
+    "specificity": 1.0,
+    "sensitivity": 0.0,
+    "kfold_metrics": null
+  },
+  "decision_tree": {
+    "roc_auc": 0.6965523548239597,
+    "accuracy": 0.7625570776255708,
+    "f1_score": 0.19111111111111112,
+    "precision": 0.11466666666666667,
+    "recall": 0.5733333333333334,
+    "mae": 0.2374429223744292,
+    "mse": 0.2374429223744292,
+    "rmse": 0.4872811533133918,
+    "mae_proba": 0.19140162326086962,
+    "mse_proba": 0.15107204323204407,
+    "confusion_matrix": {
+      "true_negative": 1126,
+      "false_positive": 332,
+      "false_negative": 32,
+      "true_positive": 43
+    },
+    "specificity": 0.7722908093278463,
+    "sensitivity": 0.5733333333333334,
+    "kfold_metrics": {
+      "accuracy": 0.7751467710371821,
+      "precision": 0.12713301685490688,
+      "recall": 0.6104489795918366,
+      "f1_score": 0.2101885823302713,
+      "roc_auc": 0.7147370385734388,
+      "specificity": 0.7835836247685661,
+      "sensitivity": 0.6104417670682731
+    }
   }
 }

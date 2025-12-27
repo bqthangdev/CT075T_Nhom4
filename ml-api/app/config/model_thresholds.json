@@ -1,0 +1,12 @@
+{
+  "model_thresholds": {
+    "svm": 0.15,
+    "decision_tree": 0.5,
+    "knn": 0.5
+  },
+  "alternative_thresholds": {
+    "svm_high_recall": 0.05,
+    "svm_optimal_f1": 0.10,
+    "svm_optimal_youden": 0.0979
+  }
+}

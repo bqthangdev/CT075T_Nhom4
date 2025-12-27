@@ -9,8 +9,9 @@ API Flask phục vụ mô hình ML (demo) cho hệ thống chuẩn đoán nguy c
 - `GET /api/v1/predictions/history` — Lịch sử dự đoán (in-memory)
 
 ## Yêu cầu hệ thống
-# Python 3.10+
-# pip
+
+- Python 3.10+
+- pip
 
 ## Cài đặt (Windows PowerShell)
 
@@ -22,6 +23,8 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 python run.py
 ```
+
+**Lưu ý quan trọng:** Đảm bảo bạn đã activate virtual environment (`.venv`) trước khi chạy server. API sẽ tự động sử dụng Python interpreter trong virtual environment khi train model qua web interface.
 
 Server chạy tại: `http://localhost:8000`
 
@@ -73,9 +76,30 @@ service sẽ dùng heuristic fallback.
 ```
 
 ## Ghi chú
-- Lịch sử được lưu tạm thời trong bộ nhớ (mất khi restart)
-- Logic tính điểm hiện tại chỉ là heuristic để demo; sẽ thay bằng mô hình ML thật sau
- ## Ghi chú
+
 - Lịch sử được lưu vào file JSON tại `app/data/history.json` (giữ 100 bản ghi gần nhất)
 - Để thay đổi đường dẫn model: đặt biến môi trường `MODEL_PATH`
 - Để thay đổi file lịch sử: đặt biến môi trường `HISTORY_FILE`
+
+## Troubleshooting
+
+### Lỗi "ModuleNotFoundError: No module named 'joblib'" khi train model
+
+**Nguyên nhân:** Flask API đang chạy nhưng virtual environment chưa được cài đặt dependencies.
+
+**Giải pháp:**
+```powershell
+cd ml-api
+. .venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Sau đó restart lại Flask API. API sẽ tự động sử dụng Python interpreter trong virtual environment khi train model.
+
+### Server không khởi động được
+
+Kiểm tra xem port 8000 đã bị sử dụng chưa. Thay đổi port trong file `.env`:
+```
+PORT=8001
+```
+

@@ -9,8 +9,8 @@ service = PredictionService()
 @predictions_bp.post('/predict')
 def predict():
     limiter = current_app.limiter
-    # Apply strict rate limit: 5 predictions per minute per IP to prevent spam
-    limiter.limit("5 per minute")(lambda: None)()
+    # Apply strict rate limit: 10 predictions per minute per IP to prevent spam
+    limiter.limit("10 per minute")(lambda: None)()
     
     try:
         payload = request.get_json(force=True, silent=False) or {}

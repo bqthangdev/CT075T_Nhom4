@@ -196,6 +196,50 @@ const ValidationPage = () => {
         },
       ],
     },
+    {
+      title: 'MAE',
+      key: 'mae',
+      width: 150,
+      children: [
+        {
+          title: 'Mean ± Std',
+          key: 'mae_mean',
+          width: 150,
+          render: (_, record) => (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                {record.mae_mean ? record.mae_mean.toFixed(4) : 'N/A'}
+              </div>
+              <div style={{ fontSize: 12, color: '#999' }}>
+                ± {record.mae_std ? record.mae_std.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+          ),
+        },
+      ],
+    },
+    {
+      title: 'RMSE',
+      key: 'rmse',
+      width: 150,
+      children: [
+        {
+          title: 'Mean ± Std',
+          key: 'rmse_mean',
+          width: 150,
+          render: (_, record) => (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontWeight: 'bold', color: '#1890ff' }}>
+                {record.rmse_mean ? record.rmse_mean.toFixed(4) : 'N/A'}
+              </div>
+              <div style={{ fontSize: 12, color: '#999' }}>
+                ± {record.rmse_std ? record.rmse_std.toFixed(4) : 'N/A'}
+              </div>
+            </div>
+          ),
+        },
+      ],
+    },
   ];
 
   const expandedRowRender = (record) => {
@@ -280,12 +324,69 @@ const ValidationPage = () => {
         key: 'roc_auc',
         render: (val) => <span style={{ color: getMetricColor(val) }}>{formatPercent(val)}</span>
       },
+      { 
+        title: 'MAE', 
+        dataIndex: 'mae', 
+        key: 'mae',
+        render: (val) => <span style={{ color: '#1890ff' }}>{val ? val.toFixed(4) : 'N/A'}</span>
+      },
+      { 
+        title: 'RMSE', 
+        dataIndex: 'rmse', 
+        key: 'rmse',
+        render: (val) => <span style={{ color: '#1890ff' }}>{val ? val.toFixed(4) : 'N/A'}</span>
+      },
     ];
 
     const foldData = record.foldDetails || [];
 
     return (
       <div style={{ padding: '16px', backgroundColor: '#fafafa' }}>
+        {/* Confusion Matrix for K-Fold */}
+        {record.confusion_matrix && (
+          <>
+            <h4 style={{ marginBottom: 16 }}>📊 Confusion Matrix (Tổng hợp tất cả folds)</h4>
+            <Row gutter={16} style={{ marginBottom: 24 }}>
+              <Col xs={12} sm={12} md={6}>
+                <Card size="small">
+                  <Statistic 
+                    title="True Negative" 
+                    value={record.confusion_matrix.tn} 
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} md={6}>
+                <Card size="small">
+                  <Statistic 
+                    title="False Positive" 
+                    value={record.confusion_matrix.fp} 
+                    valueStyle={{ color: '#ff4d4f' }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} md={6}>
+                <Card size="small">
+                  <Statistic 
+                    title="False Negative" 
+                    value={record.confusion_matrix.fn} 
+                    valueStyle={{ color: '#ff4d4f' }}
+                  />
+                </Card>
+              </Col>
+              <Col xs={12} sm={12} md={6}>
+                <Card size="small">
+                  <Statistic 
+                    title="True Positive" 
+                    value={record.confusion_matrix.tp} 
+                    valueStyle={{ color: '#52c41a' }}
+                  />
+                </Card>
+              </Col>
+            </Row>
+          </>
+        )}
+        
         <h4 style={{ marginBottom: 16 }}>📊 Chi tiết từng Fold</h4>
         <Table
           columns={foldColumns}
@@ -339,6 +440,10 @@ const ValidationPage = () => {
           f1_std: 0,
           roc_auc_mean: test.roc_auc || 0,
           roc_auc_std: 0,
+          mae_mean: test.mae || 0,
+          mae_std: 0,
+          rmse_mean: test.rmse || 0,
+          rmse_std: 0,
           train_accuracy_mean: train.accuracy || 0,
           confusion_matrix: data.confusion_matrix,
           foldDetails: [], // No folds in holdout
@@ -377,6 +482,8 @@ const ValidationPage = () => {
           recall: metrics.recall.folds[i],
           f1: metrics.f1.folds[i],
           roc_auc: metrics.roc_auc.folds[i],
+          mae: metrics.mae?.folds?.[i],
+          rmse: metrics.rmse?.folds?.[i],
         });
       }
 
@@ -392,7 +499,12 @@ const ValidationPage = () => {
         f1_std: metrics.f1?.std || 0,
         roc_auc_mean: metrics.roc_auc?.mean || 0,
         roc_auc_std: metrics.roc_auc?.std || 0,
+        mae_mean: metrics.mae?.mean || 0,
+        mae_std: metrics.mae?.std || 0,
+        rmse_mean: metrics.rmse?.mean || 0,
+        rmse_std: metrics.rmse?.std || 0,
         train_accuracy_mean: metrics.train_accuracy?.mean || 0,
+        confusion_matrix: metrics.confusion_matrix,  // Add confusion matrix for K-Fold
         foldDetails,
       };
     });

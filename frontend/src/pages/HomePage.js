@@ -30,14 +30,14 @@ const HomePage = () => {
       </Card>
 
       <div style={{ marginTop: 40, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
-        <Card title="Chính xác cao">
-          <p>Sử dụng thuật toán machine learning tiên tiến để đưa ra dự đoán chính xác</p>
+        <Card title="⭐ Chính xác cao - 67.5%">
+          <p>Sử dụng Decision Tree - Model tốt nhất với accuracy 67.5% trên test cases thực tế. Phát hiện HIGH risk chính xác 92.44%</p>
         </Card>
-        <Card title="Dễ sử dụng">
-          <p>Giao diện thân thiện, dễ dàng nhập liệu và nhận kết quả</p>
+        <Card title="🎯 Dễ sử dụng">
+          <p>Giao diện thân thiện, dễ dàng nhập liệu và nhận kết quả. Decision Tree dễ giải thích và tin cậy</p>
         </Card>
-        <Card title="Nhanh chóng">
-          <p>Kết quả chẩn đoán được trả về trong vài giây</p>
+        <Card title="⚡ Nhanh chóng">
+          <p>Kết quả chẩn đoán được trả về trong vài giây. So sánh 3 thuật toán để đảm bảo độ tin cậy</p>
         </Card>
       </div>
     </div>
