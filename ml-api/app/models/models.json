@@ -2,16 +2,16 @@
   {
     "name": "knn",
     "file": "app\\models\\knn.joblib",
-    "trained_at": "2025-12-24T04:21:23.333100Z"
+    "trained_at": "2025-12-27T01:51:24.362526Z"
   },
   {
     "name": "svm",
     "file": "app\\models\\svm.joblib",
-    "trained_at": "2025-12-24T04:21:34.829804Z"
+    "trained_at": "2025-12-27T01:51:38.424575Z"
   },
   {
     "name": "decision_tree",
     "file": "app\\models\\decision_tree.joblib",
-    "trained_at": "2025-12-24T04:21:34.902697Z"
+    "trained_at": "2025-12-27T01:51:38.527723Z"
   }
 ]

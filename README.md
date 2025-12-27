@@ -1,225 +1,247 @@
-# CT075T_Nhom4 - Hệ thống chuẩn đoán nguy cơ đột quỵ
+# HỆ THỐNG CHUẨN ĐOÁN NGUY CƠ ĐỘT QUỴ
 
-Dự án demo hệ thống chuẩn đoán nguy cơ đột quỵ áp dụng các giải thuật chuẩn đoán hiện đại.
+Hệ thống dự đoán nguy cơ đột quỵ sử dụng thuật toán Machine Learning K-Nearest Neighbors (KNN).
 
-## 📋 Mô tả dự án
+## 📋 MÔ TẢ DỰ ÁN
 
-Hệ thống sử dụng công nghệ Machine Learning để dự đoán nguy cơ đột quỵ dựa trên các thông tin sức khỏe và lối sống của bệnh nhân. Dự án bao gồm:
-- **Frontend**: React.js application với giao diện thân thiện
-- **ML API (Flask)**: API cho mô hình dự đoán (đang dùng cho demo)
-- **Backend (Node.js)**: REST API với Express.js (giữ cấu trúc, có thể tạm thời không chạy)
+Hệ thống sử dụng công nghệ Machine Learning để dự đoán nguy cơ đột quỵ dựa trên các thông tin sức khỏe và lối sống của bệnh nhân. 
 
-## 🗂️ Cấu trúc dự án
+**Thành phần:**
+- **Frontend**: React.js + Ant Design - Giao diện người dùng
+- **ML API**: Flask (Python) - API dự đoán sử dụng thuật toán KNN
+- **Dataset**: 5,110 bản ghi từ Kaggle Healthcare Dataset
+
+**Thuật toán:** K-Nearest Neighbors (KNN) với k=15 neighbors
+
+## 🗂️ CẤU TRÚC DỰ ÁN
 
 ```
 CT075T_Nhom4/
-├── backend/                 # Backend API (Node.js + Express)
+├── ml-api/                      # Flask ML API (Python)
+│   ├── app/
+│   │   ├── config/             # Model config & thresholds
+│   │   ├── data/               # Dataset CSV
+│   │   ├── models/             # Trained models (.joblib)
+│   │   ├── routes/             # API endpoints
+│   │   └── services/           # Prediction logic
+│   ├── train_model.py          # Training script
+│   ├── run.py                  # Server entry point
+│   └── requirements.txt        # Python dependencies
+│
+├── frontend/                    # React.js Frontend
 │   ├── src/
-│   │   ├── config/         # Database & environment config
-│   │   ├── controllers/    # Request handlers
-│   │   ├── models/         # Data models
-│   │   ├── routes/         # API routes
-│   │   ├── services/       # Business logic & ML algorithms
-│   │   ├── middleware/     # Custom middleware
-│   │   ├── utils/          # Utility functions
-│   │   └── server.js       # Entry point
+│   │   ├── components/         # UI components
+│   │   ├── pages/              # Page components
+│   │   ├── services/           # API calls
+│   │   └── styles/             # CSS files
 │   └── package.json
 │
-├── frontend/               # Frontend application (React.js)
-│   ├── public/            # Static files
-│   ├── src/
-│   │   ├── components/    # Reusable UI components
-│   │   ├── pages/         # Page components
-│   │   ├── services/      # API integration
-│   │   ├── contexts/      # React contexts
-│   │   ├── utils/         # Helper functions
-│   │   └── styles/        # CSS files
-│   └── package.json
-│
-├── ml-api/                 # Flask ML API (demo)
-│   ├── app/               # Source code
-│   ├── run.py             # Entry point (PORT=8000)
-│   └── requirements.txt   # Python deps
-└── README.md              # This file
+└── backend/                     # Node.js Backend (Optional)
+    └── src/                    # Express.js structure
 ```
 
-## 🚀 Cài đặt và chạy dự án
+## ⚙️ YÊU CẦU HỆ THỐNG
 
-### Yêu cầu hệ thống
-- Node.js (v16 trở lên)
-- npm hoặc yarn
-- MongoDB (optional - cho phần lưu trữ dữ liệu)
+- **Python**: 3.8+
+- **Node.js**: 16+
+- **npm**: 8+
 
-### ML API (Flask) Setup
+## 🚀 HƯỚNG DẪN CÀI ĐẶT
 
-1. Di chuyển vào thư mục ml-api:
+### Bước 1: Cài đặt ML API (Flask)
+
+**Windows (PowerShell):**
 ```powershell
 cd ml-api
-```
-
-2. Tạo virtualenv và cài đặt dependencies:
-```powershell
 python -m venv .venv
-. .venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
 ```
 
-3. Chạy server Flask:
+**Linux/Mac:**
+```bash
+cd ml-api
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+### Bước 2: Cài đặt Frontend
+
+**Windows:**
 ```powershell
-python run.py
-```
-
-Server Flask sẽ chạy tại `http://localhost:8000`
-
-### Backend Setup (Node.js - optional)
-
-1. Di chuyển vào thư mục backend:
-```bash
-cd backend
-```
-
-2. Cài đặt dependencies:
-```bash
+cd frontend
 npm install
+Copy-Item .env.example .env
 ```
 
-3. Tạo file `.env` từ `.env.example`:
-```bash
-copy .env.example .env
-```
-
-4. Chạy server:
-```bash
-# Development mode (với nodemon)
-npm run dev
-
-# Production mode
-npm start
-```
-
-Server Node sẽ chạy tại `http://localhost:5000`
-
-### Frontend Setup
-
-1. Di chuyển vào thư mục frontend:
+**Linux/Mac:**
 ```bash
 cd frontend
-```
-
-2. Cài đặt dependencies:
-```bash
 npm install
+cp .env.example .env
 ```
 
-3. Tạo file `.env` từ `.env.example`:
+### Bước 3: Training Model (Lần đầu tiên)
+
 ```bash
-copy .env.example .env
-```
-
-4. Chạy ứng dụng:
-```bash
-npm start
-```
-
-Ứng dụng sẽ chạy tại `http://localhost:3001`
-
-Mặc định frontend sẽ gọi ML API tại `http://localhost:8000` (có thể chỉnh trong `frontend/.env`).
-
-## 📊 Data source
-
-- **URL**: https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset
-- **Mô tả**: Stroke Prediction Dataset | Kaggle - 11 clinical features for predicting stroke events
-
-## 🔧 Công nghệ sử dụng
-
-### Backend
-- Node.js - JavaScript runtime
-- Express.js - Web framework
-- MongoDB - Database (NoSQL)
-- Mongoose - ODM for MongoDB
-
-### Frontend
-- Flask (ML API)
-	- Flask, flask-cors, python-dotenv
-
-- React.js - UI library
-- React Router - Routing
-- Ant Design - UI components
-- Axios - HTTP client
-
-## 📝 Tính năng
-
-✅ **Đã hoàn thành:**
-- Cấu trúc dự án cơ bản
-- API endpoints cơ bản
-- UI/UX với Ant Design
-- Form nhập liệu bệnh nhân
-- Trang lịch sử và giới thiệu
-- **So sánh 4 thuật toán ML**: Logistic Regression, Random Forest, Gradient Boosting, KNN
-- **Hiển thị metrics đầy đủ**: Accuracy, Precision, Recall, F1-Score, ROC-AUC, MAE, MSE, Confusion Matrix
-- **Cấu hình Hyperparameters**: UI để cấu hình parameters cho từng thuật toán
-- **Training trực tiếp từ UI**: Nút train models với progress bar và status real-time
-- **Giao diện responsive**: Layout tối ưu cho màn hình rộng (1800px max-width)
-
-⏳ **Đang phát triển:**
-- Kết nối MongoDB
-- Authentication & Authorization
-- Data visualization với charts
-- Unit tests
-
-## 🎯 Hướng dẫn sử dụng
-
-### Chuẩn đoán nguy cơ đột quỵ
-
-1. Truy cập trang chủ tại `http://localhost:3001`
-2. Nhấn "Bắt đầu chuẩn đoán" hoặc vào menu "Chuẩn đoán"
-3. Điền đầy đủ thông tin bệnh nhân vào form
-4. Nhấn nút "Chuẩn đoán" để nhận kết quả
-5. Xem kết quả so sánh từ 4 thuật toán khác nhau với đầy đủ metrics
-6. Xem lịch sử các lần chuẩn đoán tại menu "Lịch sử"
-
-### Cấu hình và Training Models
-
-1. Vào menu "Cấu hình Hyperparameters"
-2. Điều chỉnh các thông số kỹ thuật cho từng thuật toán:
-   - **Logistic Regression**: max_iter, solver, C, penalty, class_weight
-   - **Random Forest**: n_estimators, max_depth, min_samples_split, max_features
-   - **Gradient Boosting**: n_estimators, learning_rate, max_depth, subsample
-   - **KNN**: n_neighbors, weights, algorithm, metric
-3. Nhấn "Lưu cấu hình" để lưu thay đổi
-4. **Nhấn nút "Train Models"** trong Alert để training lại models với config mới
-5. Theo dõi tiến trình training qua progress bar trong Modal
-6. Chờ training hoàn tất (khoảng 1-2 phút)
-7. Models mới sẽ được áp dụng tự động sau khi training xong
-
-**⚠️ Lưu ý khi training:**
-- Không được đóng trang hoặc refresh browser trong lúc training
-- Các thao tác khác sẽ bị disable trong thời gian training
-- Nếu có lỗi, kiểm tra console log hoặc thử training lại
-
-### Training thủ công (Alternative)
-
-Nếu muốn training bằng command line:
-
-```powershell
 cd ml-api
 python train_model.py
 ```
 
-Sau đó restart Flask API:
+Model KNN sẽ được tạo tại `ml-api/app/models/knn.joblib`
+
+## ▶️ CHẠY DỰ ÁN
+
+### Terminal 1 - Khởi động ML API
+
 ```powershell
+cd ml-api
+.\.venv\Scripts\Activate.ps1  # Windows
+# source .venv/bin/activate    # Linux/Mac
 python run.py
 ```
 
-## ⚠️ Lưu ý quan trọng
+API chạy tại: **http://localhost:8000**
 
-Kết quả từ hệ thống chỉ mang tính chất tham khảo và hỗ trợ. Không thay thế cho chẩn đoán y khoa chuyên nghiệp. Vui lòng tham khảo ý kiến bác sĩ để có đánh giá chính xác nhất.
+### Terminal 2 - Khởi động Frontend
 
-## 👥 Nhóm phát triển
+```bash
+cd frontend
+npm start
+```
 
-Nhóm 4 - CT075T
+Frontend chạy tại: **http://localhost:3001**
 
-## 📄 License
+### Kiểm tra
+
+- ML API Health: http://localhost:8000/health
+- Frontend: http://localhost:3001
+
+## 📖 HƯỚNG DẪN SỬ DỤNG
+
+### 1. Chẩn đoán nguy cơ đột quỵ
+
+1. Truy cập http://localhost:3001
+2. Nhấn "Bắt đầu chuẩn đoán" hoặc menu "Chuẩn đoán"
+3. Điền đầy đủ thông tin bệnh nhân:
+   - Thông tin cá nhân (tuổi, giới tính, nghề nghiệp...)
+   - Chỉ số sức khỏe (BMI, đường huyết, huyết áp...)
+   - Tiền sử bệnh (tim mạch, hút thuốc...)
+4. Nhấn "Chuẩn đoán" → Xem kết quả
+5. Xuất báo cáo PDF (nếu cần)
+
+### 2. Xem lịch sử
+
+- Menu "Lịch sử" → Xem các lần chuẩn đoán trước
+- Nhấn "PDF" để xuất báo cáo
+
+### 3. Cấu hình Model (Nâng cao)
+
+1. Menu "Cấu hình Hyperparameters"
+2. Điều chỉnh tham số KNN:
+   - `n_neighbors`: Số láng giềng (5-30)
+   - `weights`: uniform/distance
+   - `algorithm`: auto/ball_tree/kd_tree
+   - `metric`: minkowski/euclidean
+3. Nhấn "Lưu cấu hình"
+4. Nhấn "Train Models" để huấn luyện lại
+
+**Hoặc training thủ công:**
+```bash
+cd ml-api
+python train_model.py
+python run.py  # Restart server
+```
+
+## 🔧 CẤU HÌNH MÔI TRƯỜNG
+
+### ml-api/.env
+```env
+FLASK_ENV=development
+FLASK_APP=run.py
+PORT=8000
+```
+
+### frontend/.env
+```env
+REACT_APP_API_URL=http://localhost:8000
+REACT_APP_API_VERSION=v1
+PORT=3001
+```
+
+## 📊 THUẬT TOÁN KNN
+
+Hệ thống sử dụng **K-Nearest Neighbors (KNN)** với cấu hình:
+- **k = 15**: Số láng giềng gần nhất
+- **weights = uniform**: Trọng số đồng đều
+- **metric = minkowski (p=2)**: Khoảng cách Euclidean
+
+**Lý do chọn KNN:**
+- Đơn giản, dễ hiểu và triển khai
+- Không cần giả định về phân phối dữ liệu
+- Hiệu quả với dữ liệu phi tuyến
+- Phù hợp với tập dữ liệu y tế
+
+## 📈 DATASET
+
+**Nguồn:** Kaggle - Healthcare Stroke Dataset  
+**Link:** https://www.kaggle.com/datasets/fedesoriano/stroke-prediction-dataset
+
+**Thông tin:**
+- 5,110 bản ghi bệnh nhân
+- 11 features: tuổi, giới tính, BMI, đường huyết, huyết áp, bệnh tim, hút thuốc...
+- Imbalanced: 4.87% stroke, 95.13% no stroke
+
+## 🛠️ XỬ LÝ LỖI THƯỜNG GẶP
+
+### Lỗi 1: Port đã được sử dụng
+```bash
+# Thay đổi port trong .env
+PORT=8001  # ml-api/.env
+PORT=3002  # frontend/.env
+```
+
+### Lỗi 2: Module not found
+```bash
+# Cài lại dependencies
+cd ml-api
+pip install -r requirements.txt
+
+cd frontend
+npm install
+```
+
+### Lỗi 3: CORS Error
+```bash
+# Kiểm tra frontend/.env
+REACT_APP_API_URL=http://localhost:8000  # Phải khớp với ML API port
+```
+
+### Lỗi 4: Model not found
+```bash
+# Training lại model
+cd ml-api
+python train_model.py
+```
+
+## ⚠️ LƯU Ý QUAN TRỌNG
+
+1. **Kết quả chỉ mang tính tham khảo**, không thay thế chẩn đoán y khoa chuyên nghiệp
+2. **Luôn tham khảo ý kiến bác sĩ** để có đánh giá chính xác
+3. Model được train trên dataset có giới hạn, có thể không áp dụng cho mọi trường hợp
+4. **Nguyên tắc "Âm tính giả - Dương tính thật":**
+   - Kết quả tốt (nguy cơ thấp) → Chưa chắc an toàn, vẫn nên khám định kỳ
+   - Kết quả xấu (nguy cơ cao) → Chắc chắn cần đi khám ngay
+
+## 👥 NHÓM PHÁT TRIỂN
+
+**Nhóm 4 - CT075T**  
+Môn: Kho dữ liệu và Khai phá dữ liệu  
+Năm học: 2025-2027
+
+## 📄 GIẤY PHÉP
 
 MIT License 
